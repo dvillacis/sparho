@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.so
+*.pyd
+
+# Rust
+target/
+Cargo.lock.*
+
+# uv / venvs
+.venv/
+.uv-cache/
+
+# Sphinx
+docs/_build/
+docs/generated/
+docs/auto_examples/
+docs/examples_built/
+docs/sg_execution_times.rst
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Benchmarks output
+benchmarks/results/
+
+.claude

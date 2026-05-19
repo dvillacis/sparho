@@ -1,0 +1,88 @@
+"""Sphinx configuration for sparho documentation."""
+
+from __future__ import annotations
+
+import os
+import sys
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+# Make the `python/` layout importable so autodoc finds sparho.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_HERE, "..", "python"))
+
+project = "sparho"
+author = "David Villacis"
+copyright = f"{datetime.now(tz=timezone.utc).year}, {author}"
+
+try:
+    release = _pkg_version("sparho")
+except PackageNotFoundError:
+    release = "0.1.0.dev0"
+version = ".".join(release.split(".")[:2])
+
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "numpydoc",
+    "myst_parser",
+    "sphinx_gallery.gen_gallery",
+]
+
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
+master_doc = "index"
+exclude_patterns = ["_build", "examples/README.txt", "Thumbs.db", ".DS_Store"]
+
+html_theme = "furo"
+html_title = f"sparho {release}"
+html_static_path = ["_static"]
+
+myst_enable_extensions = [
+    "deflist",
+    "colon_fence",
+    "smartquotes",
+]
+myst_heading_anchors = 3
+
+# Autodoc / numpydoc behavior. numpydoc consumes numpy-style docstrings;
+# napoleon stays on so that any incidentally-Google-styled docstrings also
+# parse. Keep type-hint signatures out of the parameter list — the source
+# already carries them via Python type annotations.
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": False,
+    "show-inheritance": True,
+    "member-order": "bysource",
+}
+autodoc_typehints = "description"
+autodoc_class_signature = "separated"
+numpydoc_show_class_members = False
+numpydoc_class_members_toctree = False
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "sklearn": ("https://scikit-learn.org/stable/", None),
+}
+
+# sphinx-gallery: render the runnable example scripts into docs/examples_built/.
+sphinx_gallery_conf = {
+    "examples_dirs": ["examples"],
+    "gallery_dirs": ["examples_built"],
+    "filename_pattern": r"/plot_",
+    "ignore_pattern": r"__init__\.py",
+    "remove_config_comments": True,
+    "download_all_examples": False,
+    "plot_gallery": "True",
+    "abort_on_example_error": True,
+    "show_memory": False,
+    "thumbnail_size": (320, 224),
+}
+
+# Surface warnings as build errors when invoked with `-W`.
+nitpicky = False  # numpydoc + Protocol references still produce noise on Sphinx 9
+suppress_warnings = ["myst.header"]

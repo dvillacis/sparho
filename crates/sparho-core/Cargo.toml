@@ -1,0 +1,15 @@
+[package]
+name = "sparho-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Core kernels for sparho: prox operators, CSC iteration, KKT residuals"
+
+[dependencies]
+ndarray = { workspace = true }
+num-traits = { workspace = true }
+thiserror = { workspace = true }
+
+[features]
+default = []

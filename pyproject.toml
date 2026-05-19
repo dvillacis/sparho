@@ -1,0 +1,120 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "sparho"
+version = "0.1.0"
+description = "Nonsmooth bilevel hyperparameter optimization via implicit differentiation"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "David Villacis", email = "david@villacis.net" }]
+requires-python = ">=3.11"
+keywords = [
+    "hyperparameter-optimization",
+    "bilevel",
+    "implicit-differentiation",
+    "sparse",
+    "lasso",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+]
+
+[project.optional-dependencies]
+celer = ["celer>=0.7"]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+    "maturin>=1.5",
+    "ruff",
+    "mypy",
+    "pre-commit",
+]
+docs = [
+    "sphinx>=7.4",
+    "furo>=2024.5",
+    "sphinx-gallery>=0.16",
+    "matplotlib>=3.8",
+    "numpydoc>=1.7",
+    "myst-parser>=4",
+]
+bench = [
+    "libsvmdata>=0.4",
+    "pandas>=2.1",
+    "matplotlib>=3.8",
+    # sparse-ho is not on PyPI; benchmark scripts assume the user has installed
+    # it from `pip install git+https://github.com/QB3/sparse-ho.git` (or a fork)
+    # in the same env.
+]
+
+[project.urls]
+Repository = "https://github.com/dvillacis/sparho"
+
+[tool.maturin]
+manifest-path = "crates/sparho-py/Cargo.toml"
+module-name = "sparho._core"
+python-source = "python"
+features = ["pyo3/extension-module"]
+include = ["LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "D"]
+ignore = ["D100", "D104", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"benchmarks/**" = ["D"]
+# Adapter / solver / optimizer / criterion classes carry their semantics on
+# the class docstring; the `__call__` / `init` / `value` / `value_and_hypergrad`
+# dispatchers are self-evident from the class doc.
+"python/sparho/adapters/*.py" = ["D102"]
+"python/sparho/solver.py" = ["D102"]
+"python/sparho/optimizer.py" = ["D102"]
+"python/sparho/criteria.py" = ["D102"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "bench: marks tests that are benchmark-adjacent",
+]
+filterwarnings = [
+    # sklearn 1.8+ deprecates `penalty=` on LogisticRegression in favor of
+    # `l1_ratio=`. The old kwarg still works; migrate when the minimum
+    # supported sklearn is bumped to 1.8+. Both messages contain a literal
+    # ":" which collides with pytest's filterwarnings field separator, so
+    # we suppress by category + emitting module instead.
+    "ignore::FutureWarning:sklearn.linear_model._logistic",
+    "ignore::UserWarning:sklearn.linear_model._logistic",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["python/sparho"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*", "scipy.*", "celer.*", "libsvmdata.*"]
+ignore_missing_imports = true

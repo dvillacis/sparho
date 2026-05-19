@@ -1,0 +1,17 @@
+[package]
+name = "sparho-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Python bindings for sparho-core"
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+sparho-core = { path = "../sparho-core" }
+ndarray = { workspace = true }
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py311"] }
+numpy = "0.22"
