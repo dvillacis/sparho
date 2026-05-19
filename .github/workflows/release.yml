@@ -1,39 +1,81 @@
 name: Release
 
+# Builds wheels via cibuildwheel for Linux x86_64, macOS arm64, and
+# Windows x86_64; uploads them as workflow artifacts; and (on tag
+# push) publishes to PyPI via Trusted Publishers (no API token / no
+# long-lived secret).
+#
+# One-time PyPI setup before the first publish works:
+#
+#   1. The pending-trusted-publisher flow reserves the PyPI project
+#      name `sparho` on first publish, so no separate "create
+#      project" step is needed.
+#   2. Go to https://pypi.org/manage/account/publishing/ →
+#      "Add a new pending publisher" → fill in:
+#        PyPI project name: sparho
+#        Owner:             dvillacis
+#        Repository name:   sparho
+#        Workflow filename: release.yml
+#        Environment name:  pypi   (recommended)
+#   3. On the GitHub side, create the `pypi` environment in
+#      Settings → Environments. Add reviewers / branch protection
+#      rules if you want a manual-approval gate before publishes.
+#
+# After that:
+#   * `git tag v* && git push origin v*` → builds wheels + sdist
+#     and publishes to PyPI.
+#   * Manual `workflow_dispatch` (no inputs) → builds wheels +
+#     sdist without publishing (CI-only dry run; the publish job is
+#     gated on the tag).
+
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: build wheels (${{ matrix.os }})
+  build_wheels:
+    name: wheels (${{ matrix.os }} ${{ matrix.cibw_archs }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            cibw_archs: x86_64
+          - os: macos-14
+            cibw_archs: arm64
+          - os: windows-latest
+            cibw_archs: AMD64
+          # Linux aarch64 (emulated under QEMU) and macOS Intel
+          # (macos-13) are dropped from the v0.1.x release matrix —
+          # users on those platforms `pip install` builds from sdist
+          # on first install. Add back when there's user demand.
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: install maturin + cibuildwheel
-        run: python -m pip install --upgrade pip maturin cibuildwheel
-      - name: build wheels
-        run: python -m cibuildwheel --output-dir wheels
+      - uses: pypa/cibuildwheel@v2.21
         env:
-          CIBW_BUILD: "cp311-* cp312-* cp313-*"
-          CIBW_SKIP: "*-musllinux* *-win32 *-manylinux_i686"
+          # ABI3 wheels: one wheel per platform covers cp311+.
+          # ``abi3-py311`` is set in ``crates/sparho-py/Cargo.toml``.
+          CIBW_BUILD: "cp311-*"
+          CIBW_SKIP: "*-musllinux_* *-win32 *-manylinux_i686"
+          CIBW_ARCHS: ${{ matrix.cibw_archs }}
           CIBW_BUILD_FRONTEND: "build"
-          CIBW_BEFORE_BUILD: "pip install maturin"
+          # Rust toolchain inside the manylinux container — maturin
+          # invoked transparently by the PEP 517 build backend.
+          CIBW_BEFORE_ALL_LINUX: |
+            curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH"'
+          # Smoke-test the wheel post-build.
+          CIBW_TEST_REQUIRES: "pytest numpy scipy scikit-learn"
+          CIBW_TEST_COMMAND: "pytest {project}/tests"
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
-          path: wheels/*.whl
+          name: wheels-${{ matrix.os }}-${{ matrix.cibw_archs }}
+          path: ./wheelhouse/*.whl
 
-  sdist:
-    name: build sdist
+  build_sdist:
+    name: sdist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +83,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install --upgrade maturin
+      - run: python -m pip install --upgrade pip maturin
       - run: maturin sdist --out dist
       - uses: actions/upload-artifact@v4
         with:
@@ -50,13 +92,23 @@ jobs:
 
   publish:
     name: publish to PyPI
-    needs: [build, sdist]
+    needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
+    # Only publish on tag pushes — manual workflow_dispatch runs
+    # build wheels but stop short of publishing, so you can dry-run
+    # the wheel matrix without releasing anything.
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: pypi
     permissions:
-      id-token: write
+      id-token: write   # OIDC for Trusted Publishers
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # File-immutability on PyPI means retrying a partially-uploaded
+          # release is safe with skip-existing — the already-uploaded
+          # files won't fail the whole job.
+          skip-existing: true
