@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
-import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
-# Make the `python/` layout importable so autodoc finds sparho.
-_HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(_HERE, "..", "python"))
+# sparho is installed into the environment (pip / maturin develop) before docs
+# are built; do not prepend `python/` to sys.path or the source tree will
+# shadow the installed package and the compiled `_core` extension will be
+# missing.
 
 project = "sparho"
 author = "David Villacis"
