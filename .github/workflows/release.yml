@@ -61,12 +61,21 @@ jobs:
           CIBW_SKIP: "*-musllinux_* *-win32 *-manylinux_i686"
           CIBW_ARCHS: ${{ matrix.cibw_archs }}
           CIBW_BUILD_FRONTEND: "build"
+          # Use the modern manylinux base (AlmaLinux 8 / glibc 2.28).
+          # The default ``manylinux2014`` is RHEL-7-era and recent
+          # scipy / numpy no longer publish wheels for it, so the
+          # in-wheel test job ends up source-building scipy and
+          # failing on missing OpenBLAS. ``manylinux_2_28`` is what
+          # the modern scientific Python stack ships against.
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           # Rust toolchain inside the manylinux container — maturin
           # invoked transparently by the PEP 517 build backend.
           CIBW_BEFORE_ALL_LINUX: |
             curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
           CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH"'
-          # Smoke-test the wheel post-build.
+          # Smoke-test the wheel post-build. scipy / sklearn ship
+          # binary wheels for manylinux_2_28 + macOS arm64 + Win
+          # AMD64, so this stays pip-only (no source builds).
           CIBW_TEST_REQUIRES: "pytest numpy scipy scikit-learn"
           CIBW_TEST_COMMAND: "pytest {project}/tests"
       - uses: actions/upload-artifact@v4
