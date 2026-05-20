@@ -131,7 +131,7 @@ the model-surface multipliers from skglm/celer.
    hypergradient, warm-start ≡ cold-start convergence, and
    denoising-style near-oracle α recovery. `GSURE` (general noise
    covariance) remains a v0.4+ candidate.
-3. ⏳ **sklearn-compatible wrapper estimators** — `LassoHO`,
+3. ✅ **sklearn-compatible wrapper estimators** — landed. `LassoHO`,
    `ElasticNetHO`, `LogisticRegressionHO` (`BaseEstimator +
    RegressorMixin/ClassifierMixin`, exposing `fit`/`predict`/`score`/
    `alpha_`/`coef_`/`intercept_`/`n_iter_`/`get_params`/`set_params`),
@@ -164,6 +164,21 @@ the model-surface multipliers from skglm/celer.
    `HeldOutMSE` with pre-scaled splits when this matters). Glmnet-style
    `standardize=True` is explicitly *not* supported — the audience is
    sklearn refugees, not glmnet refugees.
+
+   **v0.3 deferral (2026-05-20):** the "sparse-aware offset-adjusted
+   matvecs" path is **not** in this cut. Dense `fit_intercept=True`
+   uses upfront centering; sparse `fit_intercept=True` raises with an
+   actionable redirect to `Pipeline([StandardScaler(with_mean=False),
+   <estimator>(fit_intercept=False)])`. Plumbing `X_mean` through every
+   solver adapter + `hypergrad._build_ls_data_matvec` is tracked as a
+   v0.4 polish item — it touches the inner-solver / hypergradient stack
+   meaningfully and isn't required for the sklearn-ecosystem integration
+   value the wrappers deliver. The `check_estimator` suite passes
+   modulo seven `sample_weight` checks declared known-skip (ROADMAP §M).
+   `LogisticRegressionHO` does not support `fit_intercept=True` in v0.3
+   — the log-odds intercept is a separate dof, not a feature-centering
+   reduction; users add a constant column or accept the no-intercept
+   parameterization.
 4. ⏳ **`MultiTaskLasso` / Group-L1 (`Penalty = L21` or `GroupL1`)** —
    most-requested structural-sparsity extension. New `Penalty` union
    variant, Rust block-prox kernel, new `match` arms in

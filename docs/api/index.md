@@ -10,6 +10,7 @@ hypergrad
 search
 state
 types
+wrappers
 ```
 
 The four extension surfaces are documented separately in

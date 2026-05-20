@@ -6,6 +6,38 @@ and Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- `sparho.LassoHO`, `sparho.ElasticNetHO`, `sparho.LogisticRegressionHO` —
+  sklearn-compatible wrapper estimators (`BaseEstimator + RegressorMixin /
+  ClassifierMixin`). Each exposes `fit` / `predict` / `score` / `coef_` /
+  `intercept_` / `alpha_` / `n_iter_` / `feature_names_in_` /
+  `n_features_in_` and survives `sklearn.utils.estimator_checks.check_estimator`
+  with seven sample-weight checks marked as known-skip (ROADMAP item M).
+  Drops into `Pipeline`, `GridSearchCV`, `cross_val_score`, `clone`,
+  `permutation_importance`, MLflow autolog, and EconML/DoubleML without
+  user code changes. pandas DataFrames in → `feature_names_in_` capture
+  via sklearn's `validate_data`. **Standardization decision (2026-05-20):**
+  no `standardize=` parameter; users compose `Pipeline([StandardScaler(),
+  LassoHO()])` per the post-sklearn-1.0 norm — see the new how-to doc.
+  `fit()` emits a `UserWarning` when feature scales are uneven
+  (`ptp(X.std(axis=0)) > 10 * X.std(axis=0).mean()`). `fit_intercept=True`
+  is supported on dense X via upfront centering; sparse X + `fit_intercept=
+  True` raises with a redirect to `StandardScaler(with_mean=False)` or
+  `fit_intercept=False` (sparse-aware offset-adjusted matvecs deferred to
+  v0.4). `LogisticRegressionHO` accepts arbitrary 2-class labels and maps
+  internally to the `{-1, +1}` `LogisticLoss` convention; `predict_proba`
+  exposed for ecosystem compatibility. `sample_weight` is rejected with a
+  `NotImplementedError` pointing at ROADMAP item M. 20 new tests in
+  `tests/test_wrappers.py`. Closes ROADMAP v0.3 §3 (modulo the
+  sparse-aware-centering deferral).
+- `docs/how-to/standardization-and-leakage.md` — recipe for
+  `Pipeline([StandardScaler(), LassoHO()])` plus an explicit warning that
+  the wrapper's internal CV sees post-scaler folds (same leakage trap as
+  `LassoCV` inside a Pipeline, sklearn#26359); recommends
+  `HeldOutMSE` + outer `cross_validate` when leakage matters.
+- `random_state` parameter on `sparho.adapters.SklearnLogisticRegression`
+  (default `0`). Threads through to liblinear's internal RNG so re-fits
+  at the same hyperparameter are bit-identical — prerequisite for
+  `LogisticRegressionHO` to pass sklearn's `check_fit_idempotent`.
 - `sparho.Sure` — Stein's Unbiased Risk Estimator criterion, FDMC
   (finite-difference Monte Carlo) variant after Deledalle et al. 2014 (SUGAR).
   Tunes α for `SquaredLoss` problems with known Gaussian noise σ when no

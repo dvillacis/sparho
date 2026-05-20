@@ -92,6 +92,7 @@ convention = "numpy"
 "python/sparho/solver.py" = ["D102"]
 "python/sparho/optimizer.py" = ["D102"]
 "python/sparho/criteria.py" = ["D102"]
+"python/sparho/wrappers.py" = ["D102", "D105"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

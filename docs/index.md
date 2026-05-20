@@ -74,6 +74,13 @@ migration_from_sparse_ho
 ```
 
 ```{toctree}
+:caption: How-to
+:maxdepth: 1
+
+how-to/standardization-and-leakage
+```
+
+```{toctree}
 :caption: API reference
 :maxdepth: 2
 

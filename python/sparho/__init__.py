@@ -31,6 +31,7 @@ from .problem import (
 from .search import grad_search, hoag_search
 from .solver import Solver
 from .state import IterationRecord, SearchResult, SearchState, SolverResult
+from .wrappers import ElasticNetHO, LassoHO, LogisticRegressionHO
 
 try:
     __version__ = _pkg_version("sparho")
@@ -74,4 +75,8 @@ __all__ = [
     "grad_search",
     "hoag_search",
     "implicit_forward",
+    # sklearn-compatible wrappers
+    "ElasticNetHO",
+    "LassoHO",
+    "LogisticRegressionHO",
 ]

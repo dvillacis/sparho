@@ -202,10 +202,17 @@ class SklearnLogisticRegression:
 
     ``x0`` is accepted for protocol conformance but ignored — sklearn's
     ``LogisticRegression(solver='liblinear')`` does not support warm-start.
+
+    ``random_state`` is threaded into liblinear's internal RNG so the inner
+    fit is bit-deterministic across re-fits at the same hyperparameter — a
+    prerequisite for sklearn's ``check_fit_idempotent`` and for
+    reproducible bilevel outer searches that re-solve the same inner
+    problem at neighbouring α values.
     """
 
     tol: float = 1e-6
     max_iter: int = 10_000
+    random_state: int | None = 0
 
     def __call__(
         self,
@@ -233,6 +240,7 @@ class SklearnLogisticRegression:
             solver="liblinear",
             tol=self.tol if tol is None else float(tol),
             max_iter=self.max_iter,
+            random_state=self.random_state,
         )
         est.fit(problem.design, y)
         coef = np.asarray(est.coef_.ravel(), dtype=np.float64)
