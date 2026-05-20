@@ -22,3 +22,6 @@ through ``implicit_forward``).
 
 .. autoclass:: CrossVal
    :members:
+
+.. autoclass:: Sure
+   :members:

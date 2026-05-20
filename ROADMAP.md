@@ -120,14 +120,17 @@ the model-surface multipliers from skglm/celer.
    its solvers first? Per CLAUDE.md, design patterns from sibling repos
    are not imported wholesale — the adapter is a thin protocol shim, not
    a port.
-2. ⏳ **`SURE` / `GSURE` criterion** — Stein's Unbiased Risk Estimator
-   as a new `Criterion`, closed-form for `SquaredLoss` (reuses the
-   restricted Jacobian `implicit_forward` already builds). The unique
-   differentiator vs `LassoCV`: enables tuning when no held-out set
-   exists (denoising, signal recovery, single-fold). Reinstates sparse-
-   ho's `FiniteDiffMonteCarloSure`, dropped from v0.1's Phase 6. Pure
-   Python, no Rust, no union touch. Reference: Boyd group 2023,
-   *Tractable Evaluation of SURE with Convex Regularizers*.
+2. ✅ **`Sure` criterion** — landed. Finite-Difference Monte Carlo SURE
+   after Deledalle 2014 (SUGAR): single deterministic δ probe, default
+   `ε = 2σ/n^0.3`, two inner solves per eval, hypergradient is the sum
+   of two `implicit_forward` calls (one per solve, with the second on
+   the perturbed target `y + εδ`). Pure Python, no Rust, no union
+   touch; refuses non-`SquaredLoss` at call time. Tests cover the
+   closed-form Lasso-DOF concentration (`Σ_M FDMC-DOF / M → |support|`
+   via the Zou-Hui-Tibshirani 2007 identity), FD-parity on the
+   hypergradient, warm-start ≡ cold-start convergence, and
+   denoising-style near-oracle α recovery. `GSURE` (general noise
+   covariance) remains a v0.4+ candidate.
 3. ⏳ **sklearn-compatible wrapper estimators** — `LassoHO`,
    `ElasticNetHO`, `LogisticRegressionHO` (`BaseEstimator +
    RegressorMixin/ClassifierMixin`, exposing `fit`/`predict`/`score`/

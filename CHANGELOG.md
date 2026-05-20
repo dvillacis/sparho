@@ -5,6 +5,23 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+- `sparho.Sure` — Stein's Unbiased Risk Estimator criterion, FDMC
+  (finite-difference Monte Carlo) variant after Deledalle et al. 2014 (SUGAR).
+  Tunes α for `SquaredLoss` problems with known Gaussian noise σ when no
+  held-out set exists (denoising, signal recovery, single-fold). Two inner
+  solves per evaluation (β̂(y) and β̂(y+εδ)); `value_and_hypergrad` sums two
+  `hypergrad_fn` calls. Default ε = `2σ/n^0.3` (Deledalle heuristic), single
+  deterministic δ probe per instance for line-search monotonicity, optional
+  internal warm-start of both inner solves. Refuses non-`SquaredLoss`
+  problems at call time with a `TypeError`. Reinstates the
+  `FiniteDiffMonteCarloSure` criterion that v0.1 had dropped from Phase 6.
+  Six new tests in `tests/test_criteria.py` (protocol conformance, datafit
+  guard, seed reproducibility, MC-averaged DOF concentration at the Lasso
+  closed-form `|support(β̂)|`, FD-parity on the hypergradient, warm-start
+  ≡ cold-start convergence, vector-α / `WeightedL1` smoke); one new
+  sphinx-gallery example `plot_sure_lasso.py`. Closes ROADMAP v0.3 §2.
+
 ## [0.2.0] — 2026-05-20
 
 Closes the v0.2 perf-story arc: HOAG outer loop, inner-solver warm-start,

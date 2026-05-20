@@ -15,6 +15,7 @@ from .criteria import (
     CrossVal,
     HeldOutLogistic,
     HeldOutMSE,
+    Sure,
 )
 from .hypergrad import implicit_forward
 from .problem import (
@@ -68,6 +69,7 @@ __all__ = [
     "CrossVal",
     "HeldOutLogistic",
     "HeldOutMSE",
+    "Sure",
     # hypergradient + search
     "grad_search",
     "hoag_search",
