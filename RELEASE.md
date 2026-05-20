@@ -1,108 +1,121 @@
-# Releasing sparho v0.1.0
+# Releasing sparho v0.2.0
 
 Local prep is done (version bumped, gates green, sdist + wheel built,
-fresh-venv install verified). The remaining steps need actions on
-GitHub and PyPI that have to be driven by hand.
+fresh-venv install verified). The Trusted Publisher and GitHub `pypi`
+environment configured for v0.1.0 carry over — the remaining external
+steps are just tag → CI → publish → verify.
 
 ## Pre-release state (already in this repo)
 
-- `pyproject.toml`: `version = "0.1.0"`.
-- `Cargo.toml`: `[workspace.package] version = "0.1.0"`.
-- `CHANGELOG.md`: `[0.1.0]` section dated `2026-05-19`.
-- `.github/workflows/release.yml`: cibuildwheel + Trusted Publishers,
-  tag-triggered PyPI publish, manual `workflow_dispatch` for a
-  dry-run wheel build (no publish).
+- `pyproject.toml`: `version = "0.2.0"`.
+- `Cargo.toml`: `[workspace.package] version = "0.2.0"`.
+- `CHANGELOG.md`: `[0.2.0]` section dated `2026-05-20`; fresh empty
+  `[Unreleased]` above it.
+- `ROADMAP.md`: v0.2 items 1–5 ✅; v0.3 section added (skein, SURE,
+  sklearn wrappers, MultiTask/Group-L1, SkglmAdapter).
+- `.github/workflows/release.yml`: unchanged from v0.1.0 — cibuildwheel
+  + Trusted Publishers, tag-triggered PyPI publish, manual
+  `workflow_dispatch` for a dry-run wheel build (no publish).
 - Local artifacts in `/tmp/sparho-release-dist/`:
-  `sparho-0.1.0-cp311-abi3-macosx_11_0_arm64.whl` (260 KB),
-  `sparho-0.1.0.tar.gz` (30 KB). Fresh-venv install + smoke test passed.
+  `sparho-0.2.0-cp311-abi3-macosx_11_0_arm64.whl` (232 KB),
+  `sparho-0.2.0.tar.gz` (32 KB). Fresh-venv install + end-to-end
+  `hoag_search` smoke test passed.
+- Gates green: 94 pytest, 11 cargo, mypy strict, ruff, clippy
+  (`-D warnings`), `sphinx-build -W`.
+
+## What v0.2.0 ships (user-visible delta since 0.1.0)
+
+The HOAG outer loop, inner-solver warm-start, dense-matvec fix, and
+`CelerLasso` adapter landed under [0.1.0] in the CHANGELOG (they were
+in the 2026-05-19 wheel). What's new at the 0.2.0 tag:
+
+- `--solver {sklearn,celer}` flag in `benchmarks/lasso_libsvm.py`.
+- `CelerLasso` and `CelerElasticNet` re-exported from
+  `sparho.adapters`.
+- Reproducibility mode: `--repeat N`, `--warmup K`, `--cooldown S` with
+  median + spread reporting, interleaved sparho/`LassoCV` per iter,
+  `gc.collect()` between iters.
+- Refreshed v0.2 benchmark numbers across all three libsvm Lasso
+  datasets with HOAG + warm-start + `CelerLasso`. Headlines:
+  `leukemia` **32.8× vs `LassoCV`** (up from 8.6× with sklearn,
+  1.3× at v0.1.0); `rcv1.binary` wall halved (433 s → 211 s) at the
+  same MSE win (0.194 vs 0.225).
+- Top-level `README.md`, `benchmarks/README.md`, `ROADMAP.md`,
+  `docs/feature_research.md` (new) all updated.
 
 ## External steps the user has to drive
 
-### 1. First git commit + GitHub remote
-
-The repo has zero commits. Pick a starting line (single big "v0.1.0
-foundation" commit, or stage-by-stage history). Then:
+### 1. Commit the v0.2.0 prep
 
 ```bash
-gh repo create dvillacis/sparho --public --source . --remote origin
-git push -u origin main
+git add pyproject.toml Cargo.toml CHANGELOG.md ROADMAP.md README.md \
+        RELEASE.md benchmarks/ docs/feature_research.md \
+        python/sparho/adapters/__init__.py
+git commit -m "v0.2.0: bench refresh + repro harness + celer re-exports"
+git push origin main
 ```
 
-### 2. Configure the Trusted Publisher on PyPI
+(Pick the file list that matches what's actually in your worktree —
+`git status` is authoritative.)
 
-Without this the publish job fails with an OIDC mismatch.
+### 2. Dry-run the wheel matrix on CI
 
-PyPI: <https://pypi.org/manage/account/publishing/> → **Add a new
-pending publisher** → fill in:
-
-| Field | Value |
-|---|---|
-| PyPI project name | `sparho` |
-| Owner | `dvillacis` |
-| Repository name | `sparho` |
-| Workflow filename | `release.yml` |
-| Environment name | `pypi` |
-
-### 3. Create the GitHub environment
-
-GitHub → **Settings → Environments** → create `pypi`. Add a
-"Required reviewers" rule if you want a manual approval gate before
-the publish step runs.
-
-### 4. Dry-run the wheel matrix on CI
-
-Before tagging, run the workflow without publishing — this catches
-cibuildwheel / Rust-toolchain failures on Linux + Windows that the
-local macOS build doesn't exercise. The publish job is gated on
-`refs/tags/v*` and stays inert on manual dispatch.
+Same as v0.1.0 — workflow_dispatch builds wheels on Linux + Windows
+without publishing. Catches cibuildwheel / Rust-toolchain regressions
+that the local macOS build doesn't exercise.
 
 ```bash
 gh workflow run release.yml
 gh run watch
 ```
 
-If anything fails (wheel build error, in-wheel pytest failure), fix
-in a follow-up commit and re-dispatch.
+If anything fails, fix in a follow-up commit and re-dispatch.
 
-### 5. Tag + publish to PyPI
+### 3. Tag + publish to PyPI
 
 Once the dry-run is green:
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0 — first public release"
-git push origin v0.1.0
+git tag -a v0.2.0 -m "v0.2.0 — HOAG perf story + reproducibility harness"
+git push origin v0.2.0
 ```
 
-This re-runs `release.yml`, and on green the `publish` job uploads
-to PyPI via Trusted Publisher OIDC (no token required).
+This re-runs `release.yml`; on green, the `publish` job uploads to
+PyPI via the Trusted Publisher OIDC configured at v0.1.0 (no token
+required).
 
-### 6. Verify the PyPI install
+### 4. Verify the PyPI install
 
 ```bash
 python3.12 -m venv /tmp/sparho-pypi
 source /tmp/sparho-pypi/bin/activate
-pip install sparho==0.1.0
+pip install sparho==0.2.0
 python -c "import sparho; print(sparho.__version__)"
+python -c "from sparho.adapters import CelerLasso; print('celer re-export OK')"
 ```
 
-Then run the held-out Lasso gallery example end-to-end (the file is at
-`docs/examples/plot_held_out_lasso.py`).
+Then run the held-out Lasso gallery example end-to-end:
+`docs/examples/plot_held_out_lasso.py`.
 
-### 7. Post-release
+### 5. GitHub release
 
 ```bash
-gh release create v0.1.0 --title "sparho v0.1.0" --notes-file CHANGELOG.md
+gh release create v0.2.0 --title "sparho v0.2.0" --notes-file CHANGELOG.md
 ```
 
-Edit the release notes to point at the `[0.1.0]` block.
+Edit the rendered notes to focus on the `[0.2.0]` block.
 
-Then bump `pyproject.toml` to `0.2.0.dev0` on a `bump-dev` commit and
-add an empty `[Unreleased]` section back to `CHANGELOG.md`.
+### 6. Post-release
 
-## What's not in scope at v0.1.0
+Bump `pyproject.toml` to `0.3.0.dev0` on a `bump-dev` commit (the
+`[Unreleased]` CHANGELOG section was already re-added during prep).
+
+## What's not in scope at v0.2.0
 
 - aarch64 Linux wheels (build from sdist).
 - macOS Intel wheels (build from sdist).
-- Conda-forge feedstock (revisit once PyPI install stabilizes).
-- A perf headline beating sparse-ho/`LassoCV` across the board — that's
-  the v0.2 milestone tracked in `ROADMAP.md`.
+- Conda-forge feedstock — defer until PyPI install pattern stabilizes
+  across the v0.1 → v0.2 transition.
+- `skein` adapter, SURE criterion, `LassoHO` sklearn wrappers,
+  `MultiTaskLasso` / Group-L1, `SkglmAdapter` — all v0.3, see
+  `ROADMAP.md` and `docs/feature_research.md`.

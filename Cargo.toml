@@ -3,7 +3,7 @@ members = ["crates/sparho-core", "crates/sparho-py"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "BSD-3-Clause"
 authors = ["David Villacis <david@villacis.net>"]

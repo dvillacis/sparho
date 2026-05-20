@@ -5,6 +5,48 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-20
+
+Closes the v0.2 perf-story arc: HOAG outer loop, inner-solver warm-start,
+dense-matvec fix, and `CelerLasso` as the recommended inner solver
+landed earlier under [0.1.0]; this release lands the benchmark refresh,
+reproducibility harness, and adapter re-exports that round it out.
+Headline (single-thread, Apple M-series): `leukemia` is **32.8× faster
+than `LassoCV`** (up from 1.3× at v0.1); `rcv1.binary` wall halved (433 s
+→ 211 s) at the same MSE win (0.194 vs `LassoCV`'s 0.225). See
+`ROADMAP.md` §v0.2 and `benchmarks/README.md` for the full numbers and
+methodology. 94 pytest, 11 cargo, mypy strict, clippy clean, single
+ABI3 wheel.
+
+### Added
+- `--solver {sklearn,celer}` flag in `benchmarks/lasso_libsvm.py` so the
+  v0.2 perf story can swap in `CelerLasso` as the inner solver. `CelerLasso`
+  and `CelerElasticNet` are now re-exported from `sparho.adapters`.
+- Reproducibility mode in `benchmarks/lasso_libsvm.py`: `--repeat N` runs
+  each timed section N times with interleaved sparho/LassoCV iterations
+  (so thermal load is shared fairly), `--warmup K` drops the first K
+  samples (defaults to 1 when `--repeat > 1`), `--cooldown S` sleeps S
+  seconds between iters so macOS thermal state can settle. `gc.collect()`
+  runs between iters to keep GC out of the timed sections. Median wall +
+  `(max-min)/median` spread is reported per dataset. With
+  `--repeat 5 --cooldown 2`, sparho's own wall-time spread is 0.9–6.9 %
+  on the dense libsvm datasets — within the ROADMAP's 10 % target for
+  detecting sparho-side regressions across releases. (`LassoCV`'s own
+  jitter is the residual: ~20 % on `leukemia`, ~16 % on `rcv1.binary`;
+  the `rcv1.binary` sparho row also jitters ~33 % because each sample
+  is multi-minute and macOS throttles under sustained load. Both are
+  irreducible on macOS without process-level isolation.)
+
+### Changed
+- v0.2 benchmark numbers refreshed across all three libsvm Lasso datasets
+  with HOAG + warm-start + `CelerLasso`. Headlines (single-thread, M-series):
+  `leukemia` **32.8× vs `LassoCV`** (0.58 s vs 19.0 s — up from 8.6× with
+  the sklearn inner solver, 1.3× at v0.1); `rcv1.binary` wall halved
+  (211 s vs v0.1's 433 s) with the same quality win (sparho MSE 0.194 vs
+  `LassoCV` 0.225) — celer is ~1.65× faster than sklearn on rcv1 (347 s
+  with sklearn at v0.2); `breast-cancer` still overhead-bound. Top-level
+  `README.md`, `benchmarks/README.md`, and `ROADMAP.md` updated.
+
 ## [0.1.0] — 2026-05-19
 
 First public release. Functionally-complete nonsmooth bilevel HP

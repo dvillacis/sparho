@@ -17,34 +17,45 @@ the existing libraries are dormant (`sparse-ho`) or no longer maintained
 (`JAXopt`). `sparho` is a clean-break, scipy-stack-native Rust+Python
 implementation built for the same target audience.
 
-## v0.1 honest perf summary
+## Perf summary
+
+v0.2 numbers (HOAG + warm-start + celer inner solver), single-threaded on
+an Apple M-series; see `benchmarks/README.md` for the methodology and the
+v0.1 historical row.
 
 | dataset | shape | sparho | `LassoCV` | notes |
 |---|---|---|---|---|
-| `breast-cancer` | 683×10 | 0.24 s | 0.01 s | overhead-bound; both finish instantly |
-| `leukemia` | 38×7129 | 23.1 s | 30.1 s | **1.3× faster**; vector-α uniquely supported |
-| `rcv1.binary` | 20242×47236 sparse | 433 s, MSE **0.194** | 12 s, MSE 0.225 | **better MSE, slower wall** (see below) |
+| `breast-cancer` | 683×10 | 0.26 s | 0.02 s | overhead-bound; both finish instantly |
+| `leukemia` | 38×7129 | **0.58 s** | 19.0 s | **32.8× faster** (was 1.3× at v0.1) |
+| `rcv1.binary` | 20242×47236 sparse | 211 s, MSE **0.194** | 22.6 s, MSE 0.225 | **better MSE** (see below); 2× wall faster than v0.1 |
 
-What v0.1 delivers:
+What v0.2 delivers on top of v0.1:
 
-- Correct gradient-based outer loop with full FD parity vs analytic
-  hypergradients.
-- **Vector-α support** (`WeightedL1`, per-feature regularization) — something
-  `LassoCV` cannot do.
-- Implicit-diff hypergradients via Rust kernels on the hot path; ridge-
-  stabilized CG so the active-set-restricted linear solve does not
-  diverge on ill-conditioned sparse designs.
-- Clean Protocol-based API for sparse-ho refugees.
-- 92 pytest, mypy strict, clippy clean, single wheel via maturin.
+- `hoag_search` outer loop (Pedregosa 2016): adaptive step from a
+  Lipschitz proxy, `+C·tol` slack acceptance, exponentially-decreasing
+  inner-tol schedule. Replaces `LineSearch`.
+- Inner-solver warm-starting threaded through the `Solver` Protocol +
+  every adapter + `CrossVal(warm_start=True)`.
+- celer adapter recommended for the high-d regime — compounding the
+  HOAG/warm-start win into 32.8× on `leukemia` and 1.65× faster than
+  sklearn on `rcv1.binary`.
+- Dense-matvec fix in `implicit_forward` (no `coo_tocsr` round-trip on
+  dense designs): 8.4× faster hypergradient solve on `leukemia`.
+
+Everything v0.1 delivered still holds: gradient-based outer loop with
+full FD parity, vector-α (`WeightedL1`) which `LassoCV` cannot do,
+ridge-stabilized hypergradient-CG on ill-conditioned sparse designs,
+clean Protocol-based API, mypy strict + clippy clean, single wheel via
+maturin.
 
 **The rcv1 story.** Implicit differentiation lets sparho search past
 `LassoCV`'s discrete grid: on `rcv1.binary`, sparho's outer loop drives
 α down to `2.1·10⁻⁵`, well below `LassoCV`'s grid floor of `1·10⁻⁴`,
-and lands on a **better held-out MSE** (0.194 vs 0.225). The wall-time
-penalty (433 s vs 12 s) comes from the inner Lasso solver being cold-
-started at every outer iter — see the v0.2 plan for warm-starting, which
-the v0.1 spike (`benchmarks/spike_warmstart.py`) measured at ~2× on
-dense cases.
+and lands on a **14 % better held-out MSE** (0.194 vs 0.225). The
+wall-time gap halved at v0.2 (433 s → 211 s) thanks to warm-start +
+celer; the remaining gap is irreducible inner-solver work at very small
+α / large active set. sparho's win on this dataset is *quality per
+outer iter*, not raw wall time.
 
 ## Install (planned)
 
@@ -87,11 +98,17 @@ See `docs/migration_from_sparse_ho.md` for translation from sparse-ho's API.
 
 ## Roadmap
 
-See `ROADMAP.md`. v0.1 ships sklearn + celer + callable adapters with
-verified correctness and dense-high-d parity vs `LassoCV`. v0.2 closes the
-two remaining perf gaps — inner-solver warm-starting and hypergradient
-stability on large sparse designs — and adds a `skein` backend for
-nonconvex weighted/group penalties.
+See `ROADMAP.md`. v0.1 shipped sklearn + celer + callable adapters with
+verified correctness and dense-high-d parity vs `LassoCV`. v0.2 closes
+the inner-solver warm-starting and hypergradient-stability gaps and
+lands the HOAG outer loop — 32.8× on `leukemia`, 2× wall on
+`rcv1.binary`. v0.3 lands the sklearn-ecosystem wrappers (`LassoHO`,
+`ElasticNetHO`, `LogisticRegressionHO`) so sparho slots into
+`Pipeline` / EconML / MLflow, the `SURE` / `GSURE` criterion for
+unsupervised tuning, a `MultiTaskLasso` / Group-L1 penalty, and adapters
+for `skein` (nonconvex weighted/group) and `skglm` (MCP / SCAD / SLOPE /
+Group / Huber / Poisson). See `docs/feature_research.md` for the
+2026-05-20 landscape synthesis behind these picks.
 
 ## License
 
