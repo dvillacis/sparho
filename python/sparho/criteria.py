@@ -41,13 +41,18 @@ class CriterionResult:
     ``coef`` and ``active_set`` are reported from the last (or only) inner
     solve; for ``CrossVal`` they come from the final fold and are diagnostic
     only — the user is expected to refit on the full data at ``best_hyperparam``
-    if a single final β is needed.
+    if a single final β is needed. ``inner_dual_gap`` is the maximum over
+    contributing inner solves (worst-fold convergence for ``CrossVal``, max
+    of the two solves for ``Sure``) — the outer loop reads it via
+    ``IterationRecord.extras`` for live diagnostics. ``None`` if the
+    criterion didn't surface a gap.
     """
 
     value: float
     hypergrad: Hyperparam
     coef: Array
     active_set: IndexArray
+    inner_dual_gap: float | None = None
 
 
 @runtime_checkable
@@ -181,6 +186,7 @@ class HeldOutMSE:
             hypergrad=hg,
             coef=result.coef,
             active_set=result.active_set,
+            inner_dual_gap=float(result.dual_gap),
         )
 
     def _mse(self, problem: Problem, beta: Array) -> float:
@@ -242,6 +248,7 @@ class HeldOutLogistic:
             hypergrad=hg,
             coef=result.coef,
             active_set=result.active_set,
+            inner_dual_gap=float(result.dual_gap),
         )
 
     def _loss(self, problem: Problem, beta: Array) -> float:
@@ -352,6 +359,7 @@ class CrossVal:
         total_hg: Hyperparam | None = None
         last_coef: Array | None = None
         last_active: IndexArray | None = None
+        worst_gap: float | None = None
         for i, (idx_tr, idx_val) in enumerate(self.folds):
             crit = self.base(idx_tr, idx_val)
             fold_x0 = cache[i] if cache is not None else None
@@ -362,12 +370,17 @@ class CrossVal:
             total_hg = res.hypergrad if total_hg is None else _hg_add(total_hg, res.hypergrad)
             last_coef = res.coef
             last_active = res.active_set
+            if res.inner_dual_gap is not None:
+                worst_gap = (
+                    res.inner_dual_gap if worst_gap is None else max(worst_gap, res.inner_dual_gap)
+                )
         assert total_hg is not None and last_coef is not None and last_active is not None
         return CriterionResult(
             value=total_value / n,
             hypergrad=_hg_scale(total_hg, 1.0 / n),
             coef=last_coef,
             active_set=last_active,
+            inner_dual_gap=worst_gap,
         )
 
 
@@ -534,4 +547,5 @@ class Sure:
             hypergrad=_hg_add(hg1, hg2),
             coef=r1.coef,
             active_set=r1.active_set,
+            inner_dual_gap=float(max(r1.dual_gap, r2.dual_gap)),
         )

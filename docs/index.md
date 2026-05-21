@@ -70,6 +70,7 @@ installation
 quickstart
 concepts
 protocols
+stability
 migration_from_sparse_ho
 ```
 

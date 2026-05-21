@@ -52,7 +52,7 @@ from .problem import L1, LogisticLoss, Problem, SquaredLoss
 from .problem import ElasticNet as ElasticNetPenalty
 from .search import grad_search, hoag_search
 from .solver import Solver
-from .state import SearchResult
+from .state import IterationRecord, SearchResult
 
 OuterMethod = Literal["hoag", "grad"]
 
@@ -110,6 +110,40 @@ def _check_sample_weight(sample_weight: Array | None) -> None:
         )
 
 
+class _VerbosePrinter:
+    """Default callback wired by ``verbose > 0`` on the wrapper estimators.
+
+    Output is plain text on ``stdout`` so it composes with notebooks and
+    captured-stdout test fixtures. ``verbose=1`` prints one line per iter
+    with α, criterion value, log-space gradient norm, and the
+    ``cg_status`` from extras. ``verbose>=2`` also prints ``step_size`` and
+    ``L_estimate`` (HOAG only — absent under ``grad_search``).
+    """
+
+    def __init__(self, level: int, *, name: str) -> None:
+        self.level = int(level)
+        self.name = name
+
+    def __call__(self, record: IterationRecord) -> None:
+        hp = record.hyperparam
+        if isinstance(hp, np.ndarray):
+            alpha_repr = f"|α|₂={float(np.linalg.norm(hp)):.4g}"
+        else:
+            alpha_repr = f"{float(hp):.4g}"
+        cg_status = record.extras.get("cg_status", "ok")
+        msg = (
+            f"[{self.name}] iter {record.iteration:3d}: "
+            f"α={alpha_repr}  value={record.value:.6g}  "
+            f"|∇θ|={record.grad_norm:.3g}  cg={cg_status}"
+        )
+        if self.level >= 2:
+            ss = record.extras.get("step_size")
+            le = record.extras.get("L_estimate")
+            if isinstance(ss, float) and isinstance(le, float):
+                msg += f"  step={ss:.3g}  L={le:.3g}"
+        print(msg)
+
+
 def _run_search(
     problem: Problem,
     hp0: Hyperparam,
@@ -119,6 +153,7 @@ def _run_search(
     outer: OuterMethod,
     n_iter: int,
     inner_tol: float,
+    callback: Callable[[IterationRecord], None] | None = None,
 ) -> SearchResult:
     if outer == "hoag":
         return hoag_search(
@@ -128,6 +163,7 @@ def _run_search(
             criterion=criterion,
             n_iter=n_iter,
             inner_tol=inner_tol,
+            callback=callback,
         )
     if outer == "grad":
         return grad_search(
@@ -137,6 +173,7 @@ def _run_search(
             criterion=criterion,
             n_iter=n_iter,
             tol=inner_tol,
+            callback=callback,
         )
     raise ValueError(f"outer must be 'hoag' or 'grad', got {outer!r}")
 
@@ -196,6 +233,10 @@ class LassoHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
     random_state
         Seed for the default ``CrossVal`` fold split. Ignored if ``criterion``
         is supplied.
+    verbose
+        ``0`` (default) is silent. ``1`` prints one line per outer iter via a
+        default ``_VerbosePrinter`` callback wired into the search. ``2`` adds
+        ``step_size`` / ``L_estimate`` to each line (HOAG only).
 
     Attributes
     ----------
@@ -220,6 +261,7 @@ class LassoHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
         inner_tol: float = 1e-6,
         cv_folds: int = _DEFAULT_CV_FOLDS,
         random_state: int | None = None,
+        verbose: int = 0,
     ) -> None:
         self.alpha_init = alpha_init
         self.fit_intercept = fit_intercept
@@ -230,6 +272,7 @@ class LassoHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
         self.inner_tol = inner_tol
         self.cv_folds = cv_folds
         self.random_state = random_state
+        self.verbose = verbose
 
     def fit(
         self,
@@ -255,6 +298,7 @@ class LassoHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
                 random_state=self.random_state,
             )
         )
+        callback = _VerbosePrinter(self.verbose, name="LassoHO") if self.verbose > 0 else None
         result = _run_search(
             problem,
             float(self.alpha_init),
@@ -263,6 +307,7 @@ class LassoHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
             outer=self.outer,
             n_iter=self.n_iter,
             inner_tol=self.inner_tol,
+            callback=callback,
         )
         self.coef_ = np.asarray(result.best_coef, dtype=np.float64)
         self.intercept_ = float(y_mean - X_mean @ self.coef_) if self.fit_intercept else 0.0
@@ -323,6 +368,7 @@ class ElasticNetHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
         inner_tol: float = 1e-6,
         cv_folds: int = _DEFAULT_CV_FOLDS,
         random_state: int | None = None,
+        verbose: int = 0,
     ) -> None:
         self.alpha_init = alpha_init
         self.rho = rho
@@ -334,6 +380,7 @@ class ElasticNetHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
         self.inner_tol = inner_tol
         self.cv_folds = cv_folds
         self.random_state = random_state
+        self.verbose = verbose
 
     def fit(
         self,
@@ -361,6 +408,7 @@ class ElasticNetHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
                 random_state=self.random_state,
             )
         )
+        callback = _VerbosePrinter(self.verbose, name="ElasticNetHO") if self.verbose > 0 else None
         result = _run_search(
             problem,
             float(self.alpha_init),
@@ -369,6 +417,7 @@ class ElasticNetHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
             outer=self.outer,
             n_iter=self.n_iter,
             inner_tol=self.inner_tol,
+            callback=callback,
         )
         self.coef_ = np.asarray(result.best_coef, dtype=np.float64)
         self.intercept_ = float(y_mean - X_mean @ self.coef_) if self.fit_intercept else 0.0
@@ -434,6 +483,7 @@ class LogisticRegressionHO(ClassifierMixin, BaseEstimator):  # type: ignore[misc
         inner_tol: float = 1e-6,
         cv_folds: int = _DEFAULT_CV_FOLDS,
         random_state: int | None = None,
+        verbose: int = 0,
     ) -> None:
         self.alpha_init = alpha_init
         self.fit_intercept = fit_intercept
@@ -444,6 +494,7 @@ class LogisticRegressionHO(ClassifierMixin, BaseEstimator):  # type: ignore[misc
         self.inner_tol = inner_tol
         self.cv_folds = cv_folds
         self.random_state = random_state
+        self.verbose = verbose
 
     def fit(
         self,
@@ -498,6 +549,9 @@ class LogisticRegressionHO(ClassifierMixin, BaseEstimator):  # type: ignore[misc
                 random_state=self.random_state,
             )
         )
+        callback = (
+            _VerbosePrinter(self.verbose, name="LogisticRegressionHO") if self.verbose > 0 else None
+        )
         result = _run_search(
             problem,
             float(self.alpha_init),
@@ -506,6 +560,7 @@ class LogisticRegressionHO(ClassifierMixin, BaseEstimator):  # type: ignore[misc
             outer=self.outer,
             n_iter=self.n_iter,
             inner_tol=self.inner_tol,
+            callback=callback,
         )
         self.coef_ = np.asarray(result.best_coef, dtype=np.float64).reshape(1, -1)
         self.intercept_ = np.zeros(1, dtype=np.float64)

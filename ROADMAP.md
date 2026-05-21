@@ -277,7 +277,7 @@ the validation patterns 0.3.1 installs, so adapter code stays thin.
    hit the 10 % speedup-ratio target the v0.2 reproducibility
    section deferred. Add `cargo audit`, `pre-commit run --all-files`,
    and `pytest --doctest-modules python/sparho` steps.
-3. ⏳ **Observability.** Optional
+3. ✅ **Observability.** Optional
    `callback: Callable[[IterationRecord], None] | None` on
    `grad_search` / `hoag_search` (default `None`, current behavior
    unchanged) called after every accepted outer iter — enables live

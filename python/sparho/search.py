@@ -40,23 +40,25 @@ from .solver import Solver
 from .state import IterationRecord, SearchResult
 
 
-def _extras_from_warnings(captured: list[warnings.WarningMessage]) -> dict[str, object]:
-    """Translate captured RuntimeWarnings from ``implicit_forward`` into extras."""
-    extras: dict[str, object] = {}
+def _cg_status_from_warnings(captured: list[warnings.WarningMessage]) -> str:
+    """Map captured ``implicit_forward`` warnings to a single ``cg_status``.
+
+    Returns ``"nonfinite"`` if any captured warning indicates a non-finite
+    CG output (the strictly worse failure mode), ``"nonconvergence"`` if CG
+    returned a finite but unconverged result, otherwise ``"ok"``.
+    """
+    status = "ok"
     for w in captured:
         if not issubclass(w.category, RuntimeWarning):
             continue
         msg = str(w.message)
+        if "non-finite hypergradient" in msg or "non-finite gradient" in msg:
+            return "nonfinite"
         if "CG failed" in msg:
-            # The warning text encodes both info!=0 (non-convergence) and the
-            # finite check; pull both out so downstream tooling can tell which.
             if "finite=False" in msg:
-                extras["cg_nonfinite"] = True
-            else:
-                extras["cg_nonconvergence"] = True
-        elif "non-finite hypergradient" in msg or "non-finite gradient" in msg:
-            extras["cg_nonfinite"] = True
-    return extras
+                return "nonfinite"
+            status = "nonconvergence"
+    return status
 
 
 HypergradFn = Callable[..., Hyperparam]
@@ -72,6 +74,7 @@ def grad_search(
     n_iter: int = 50,
     lr: float = 0.1,
     tol: float = 1e-6,
+    callback: Callable[[IterationRecord], None] | None = None,
 ) -> SearchResult:
     """Classical bilevel approximate-gradient descent in ``θ = log α`` space.
 
@@ -104,6 +107,11 @@ def grad_search(
         Learning rate applied in ``θ``-space.
     tol
         Stationarity tolerance on the ``log``-space hypergradient norm.
+    callback
+        Optional per-iter callback. Invoked exactly once per appended
+        :class:`IterationRecord` (after ``best_value`` is updated, before the
+        early-stopping check). Use for live plotting, progress bars, or
+        external early-stopping logic. Default ``None`` (no-op).
 
     Returns
     -------
@@ -130,7 +138,9 @@ def grad_search(
                 filename=_w.filename,
                 lineno=_w.lineno,
             )
-        extras = _extras_from_warnings(captured)
+        extras: dict[str, object] = {"cg_status": _cg_status_from_warnings(captured)}
+        if result.inner_dual_gap is not None:
+            extras["inner_dual_gap"] = float(result.inner_dual_gap)
         # Chain rule: ``dC/dθ = dC/dα · α`` (elementwise for vector α).
         hg_theta = _elementwise_mul(result.hypergrad, hp)
         grad_norm = _norm(hg_theta)
@@ -139,16 +149,17 @@ def grad_search(
             best_value = result.value
             best_hp = hp
 
-        history.append(
-            IterationRecord(
-                iteration=k,
-                hyperparam=hp,
-                value=result.value,
-                grad_norm=grad_norm,
-                n_inner_iter=0,
-                extras=extras,
-            )
+        record = IterationRecord(
+            iteration=k,
+            hyperparam=hp,
+            value=result.value,
+            grad_norm=grad_norm,
+            n_inner_iter=0,
+            extras=extras,
         )
+        history.append(record)
+        if callback is not None:
+            callback(record)
 
         if not np.all(np.isfinite(np.asarray(hg_theta))):
             warnings.warn(
@@ -194,6 +205,7 @@ def hoag_search(
     C: float = 0.25,
     factor: float = 1.0,
     max_step: float = 0.5,
+    callback: Callable[[IterationRecord], None] | None = None,
 ) -> SearchResult:
     """HOAG (Hyperparameter Optimization with Approximate Gradients, Pedregosa 2016).
 
@@ -247,6 +259,11 @@ def hoag_search(
         region: prevents the first step from overshooting into a
         zero-gradient region (e.g. when the active set collapses) before
         the ``L`` adaptation has had a chance to discipline the step size.
+    callback
+        Optional per-iter callback. Invoked once per appended
+        :class:`IterationRecord` (including a second call when the
+        rejection branch replaces the most recent record after a retry).
+        Default ``None`` (no-op).
 
     Returns
     -------
@@ -277,6 +294,17 @@ def hoag_search(
     value_prev = float("inf")
     converged = False
 
+    def _base_extras(cg_status: str, dual_gap: float | None) -> dict[str, object]:
+        extras: dict[str, object] = {"cg_status": cg_status}
+        if dual_gap is not None:
+            extras["inner_dual_gap"] = float(dual_gap)
+        return extras
+
+    def _emit(record: IterationRecord) -> None:
+        history.append(record)
+        if callback is not None:
+            callback(record)
+
     for k in range(n_iter):
         tol_k = float(tol_schedule[k])
         old_tol = float(tol_schedule[k - 1]) if k > 0 else tol_k
@@ -293,25 +321,16 @@ def hoag_search(
                 filename=_w.filename,
                 lineno=_w.lineno,
             )
-        extras = _extras_from_warnings(captured)
+        cg_status = _cg_status_from_warnings(captured)
         value = result.value
         grad = _elementwise_mul(result.hypergrad, hp)  # dC/dθ = dC/dα · α
         grad_norm = _norm(grad)
 
-        history.append(
-            IterationRecord(
-                iteration=k,
-                hyperparam=hp,
-                value=value,
-                grad_norm=grad_norm,
-                n_inner_iter=0,
-                extras=extras,
-            )
-        )
         if np.isfinite(value) and value < best_value:
             best_value = value
             best_hp = hp
 
+        # 2. Non-finite gradient → record what we have and skip the step.
         if not np.all(np.isfinite(np.asarray(grad))):
             warnings.warn(
                 f"hoag_search: non-finite gradient at iter {k}; "
@@ -319,9 +338,19 @@ def hoag_search(
                 RuntimeWarning,
                 stacklevel=2,
             )
+            _emit(
+                IterationRecord(
+                    iteration=k,
+                    hyperparam=hp,
+                    value=value,
+                    grad_norm=grad_norm,
+                    n_inner_iter=0,
+                    extras=_base_extras(cg_status, result.inner_dual_gap),
+                )
+            )
             continue
 
-        # 2. Init L on first iter from gradient magnitude (sparse-ho heuristic).
+        # 3. Init L on first iter from gradient magnitude (sparse-ho heuristic).
         if L is None:
             if grad_norm > 1e-3:
                 if is_array:
@@ -331,24 +360,39 @@ def hoag_search(
             else:
                 L = 1.0
 
-        if grad_norm < outer_tol:
-            converged = True
-            break
-
-        # Step-size cap: bound the θ-step magnitude so the first iter can't
-        # overshoot into a zero-gradient region before ``L`` adapts. ``L`` is
-        # raised, not the step clipped post-hoc, so the acceptance test sees
-        # the actual effective L.
+        # 4. Step-size cap: bound the θ-step so the first iter can't overshoot
+        #    a zero-gradient region before ``L`` adapts. We raise ``L`` (rather
+        #    than clipping post-hoc) so the acceptance test sees the effective
+        #    Lipschitz proxy, and so ``L_estimate`` in extras reflects the
+        #    value that actually drove the step.
         if grad_norm * max_step > 0 and 1.0 / L * grad_norm > max_step:
             L = grad_norm / max_step
         step_size = 1.0 / L
         incr = step_size * grad_norm
 
-        # 3. Tentative step.
+        extras = _base_extras(cg_status, result.inner_dual_gap)
+        extras["step_size"] = float(step_size)
+        extras["L_estimate"] = float(L)
+        _emit(
+            IterationRecord(
+                iteration=k,
+                hyperparam=hp,
+                value=value,
+                grad_norm=grad_norm,
+                n_inner_iter=0,
+                extras=extras,
+            )
+        )
+
+        if grad_norm < outer_tol:
+            converged = True
+            break
+
+        # 5. Tentative step.
         theta_pre = _copy(theta)
         theta = _sub(theta, _scale(grad, step_size))
 
-        # 4. Retrospective acceptance test on the PREVIOUS step
+        # 6. Retrospective acceptance test on the PREVIOUS step
         #    (the step that brought us to this θ from θ_pre_last_iter).
         slack_good = (
             value_prev + C * tol_k + old_tol * (C + factor) * incr - factor * L * incr * incr
@@ -378,18 +422,24 @@ def hoag_search(
                     filename=_w.filename,
                     lineno=_w.lineno,
                 )
-            extras_retry = _extras_from_warnings(captured_retry)
+            cg_status_retry = _cg_status_from_warnings(captured_retry)
             value = result.value
             grad = _elementwise_mul(result.hypergrad, _exp(theta))
             grad_norm = _norm(grad)
-            history[-1] = IterationRecord(
+            retry_extras = _base_extras(cg_status_retry, result.inner_dual_gap)
+            retry_extras["step_size"] = float(1.0 / L)
+            retry_extras["L_estimate"] = float(L)
+            retry_record = IterationRecord(
                 iteration=k,
                 hyperparam=_exp(theta),
                 value=value,
                 grad_norm=grad_norm,
                 n_inner_iter=0,
-                extras=extras_retry,
+                extras=retry_extras,
             )
+            history[-1] = retry_record
+            if callback is not None:
+                callback(retry_record)
             if np.isfinite(value) and value < best_value:
                 best_value = value
                 best_hp = _exp(theta)

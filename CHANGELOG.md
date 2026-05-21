@@ -22,6 +22,26 @@ and Semantic Versioning.
   `tests/test_ffi_safety.py` cover bad CSC structure, out-of-range active
   indices, non-contiguous slices, and bad group partitions.
 
+### Observability
+- **Observability hooks (v0.4 §3).** `grad_search` and `hoag_search` gain
+  an optional `callback: Callable[[IterationRecord], None] | None = None`
+  kwarg, invoked once per appended `IterationRecord` (and once more on the
+  HOAG rejection branch's replacement record). `IterationRecord.extras` is
+  now populated systematically: `cg_status` (`"ok"` /
+  `"nonconvergence"` / `"nonfinite"`, replaces the v0.3.1
+  `cg_nonconvergence` / `cg_nonfinite` boolean keys); `inner_dual_gap`
+  (float, propagated from `HeldOutMSE` / `HeldOutLogistic`; max-across
+  for `CrossVal` / `Sure`); HOAG records additionally carry `step_size`
+  and `L_estimate`. `CriterionResult` gained an
+  `inner_dual_gap: float | None = None` field. The three wrappers
+  (`LassoHO`, `ElasticNetHO`, `LogisticRegressionHO`) gain `verbose:
+  int = 0`; `verbose=1` wires a default `_VerbosePrinter` callback that
+  prints one line per outer iter (`verbose=2` also prints `step_size` /
+  `L_estimate`). New `docs/stability.md` declares the frozen-stable /
+  experimental / private surfaces, with the `extras` schema tabled out
+  and flagged stability-experimental. 10 new tests in
+  `tests/test_observability.py`. Closes ROADMAP v0.4 §3.
+
 ### CI
 - **CI hardening (v0.4 §2).** PR matrix now includes `windows-latest`
   (both the rust and python jobs; Windows tested on Python 3.12 with the
