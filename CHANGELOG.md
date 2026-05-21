@@ -22,6 +22,28 @@ and Semantic Versioning.
   `tests/test_ffi_safety.py` cover bad CSC structure, out-of-range active
   indices, non-contiguous slices, and bad group partitions.
 
+### Docs & community
+- **Docs & community surface (v0.4 §6).** New top-level `CONTRIBUTING.md`
+  (dev setup via `uv sync --extra dev` + `maturin develop`, the gate
+  commands, the architecture pillars, the closed-union extension
+  recipe, commit norms) and `SECURITY.md` (private email reporting,
+  90-day disclosure window, explicit threat-model statement). New
+  GitHub issue templates (`.github/ISSUE_TEMPLATE/bug.md`, `feature.md`)
+  and `.github/PULL_REQUEST_TEMPLATE.md` carrying the gate checklist
+  + CHANGELOG reminder. Two new sphinx-gallery examples:
+  `docs/examples/plot_group_lasso.py` (Group-L1 end-to-end with HOAG;
+  recovers the right active groups on synthetic block-sparse data) and
+  `docs/examples/plot_migration_from_sparse_ho.py` (runnable
+  side-by-side translation that pairs with the prose
+  `migration_from_sparse_ho.md` table). `pyproject.toml [project.urls]`
+  gained `Documentation` (RTD), `Issues` (GitHub), `Changelog`
+  (GitHub) — the metadata PyPI uses for the project sidebar.
+  `migration_from_sparse_ho.md` row for `FiniteDiffMonteCarloSure`
+  updated to point at the v0.3 §2 `Sure` landing. The frozen-stable /
+  experimental / private surface declaration that was originally
+  scoped here landed in v0.4 §3 (`docs/stability.md`).
+  Closes ROADMAP v0.4 §6.
+
 ### Observability
 - **Observability hooks (v0.4 §3).** `grad_search` and `hoag_search` gain
   an optional `callback: Callable[[IterationRecord], None] | None = None`

@@ -63,6 +63,9 @@ bench = [
 
 [project.urls]
 Repository = "https://github.com/dvillacis/sparho"
+Documentation = "https://sparho.readthedocs.io"
+Issues = "https://github.com/dvillacis/sparho/issues"
+Changelog = "https://github.com/dvillacis/sparho/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 manifest-path = "crates/sparho-py/Cargo.toml"

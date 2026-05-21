@@ -299,7 +299,7 @@ the validation patterns 0.3.1 installs, so adapter code stays thin.
    Poisson / Gamma) plus `CelerMultiTaskLasso`, `CelerGroupLasso`,
    `CelerLogisticRegression`. Each ~50–80 LOC; pure adapters with no
    algorithm work.
-6. ⏳ **Docs & community surface.** `CONTRIBUTING.md` (dev setup via
+6. ✅ **Docs & community surface.** `CONTRIBUTING.md` (dev setup via
    `uv sync --extra dev` + `maturin develop`, the mypy / clippy /
    ruff gates, the pre-commit install requirement), `SECURITY.md`
    (vulnerability path), `.github/ISSUE_TEMPLATE/{bug,feature}.md`

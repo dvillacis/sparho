@@ -62,7 +62,7 @@ naive fixed-`lr` outer loop (sparse-ho's `GradientDescent` optimizer).
 | `HeldOutLogistic(idx_train, idx_val)` | `HeldOutLogistic(idx_train, idx_val)` | `y ∈ {−1, +1}` (same convention). |
 | `CrossVal(cv, criterion=HeldOutMSE)` | `CrossVal.kfold(n_samples, k=...)` or `CrossVal(folds=..., base=HeldOutMSE)` | sparho's `CrossVal` is a frozen dataclass; build it once and reuse. Opt-in `warm_start=True` reuses per-fold `β*` across outer iters. |
 | `HeldOutSmoothedHinge(...)` | not at v0.1 | SVM/SVR family deferred. |
-| `FiniteDiffMonteCarloSure(...)` | not at v0.1 | SURE deferred — see "Out of scope" in `ROADMAP.md`. |
+| `FiniteDiffMonteCarloSure(...)` | `Sure(sigma=..., epsilon=..., random_state=...)` | Landed in v0.3 §2 (FDMC after Deledalle 2014). Refuses non-`SquaredLoss` problems. |
 
 ### Optimizers → search function
 
