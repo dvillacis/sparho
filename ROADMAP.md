@@ -264,7 +264,7 @@ the validation patterns 0.3.1 installs, so adapter code stays thin.
    inputs (empty problem, all-zero target, single-class for logistic,
    all-features-collinear, `n < p × 10`); `WeightedL1` and `GroupL1`
    vector-α under `hoag_search` rejection + exponential-tol schedule.
-2. ⏳ **CI hardening.** Add `windows-latest` to the `python` + `rust`
+2. ✅ **CI hardening.** Add `windows-latest` to the `python` + `rust`
    PR CI matrix (wheels already ship to Windows via cibuildwheel but
    were never PR-tested). Add a wheel-import smoke step in
    `release.yml` between cibuildwheel and PyPI upload that extracts

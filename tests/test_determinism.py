@@ -40,9 +40,7 @@ def test_cross_val_kfold_deterministic_at_fixed_random_state():
 
     def _run(seed: int):
         cv = CrossVal.kfold(n, k=5, shuffle=True, random_state=seed, base=HeldOutMSE)
-        return hoag_search(
-            problem, 0.1, solver=solver, criterion=cv, n_iter=5, inner_tol=1e-6
-        )
+        return hoag_search(problem, 0.1, solver=solver, criterion=cv, n_iter=5, inner_tol=1e-6)
 
     r1 = _run(0)
     r2 = _run(0)
@@ -63,9 +61,7 @@ def test_cross_val_different_seeds_differ_in_general():
 
     def _run(seed: int):
         cv = CrossVal.kfold(n, k=5, shuffle=True, random_state=seed, base=HeldOutMSE)
-        return hoag_search(
-            problem, 0.1, solver=solver, criterion=cv, n_iter=5, inner_tol=1e-6
-        )
+        return hoag_search(problem, 0.1, solver=solver, criterion=cv, n_iter=5, inner_tol=1e-6)
 
     r0 = _run(0)
     r1 = _run(1)
@@ -83,9 +79,7 @@ def test_sure_deterministic_at_fixed_random_state():
 
     def _run(seed: int):
         sure = Sure(sigma=0.1, random_state=seed)
-        return grad_search(
-            problem, 0.1, solver=solver, criterion=sure, n_iter=4, lr=0.05
-        )
+        return grad_search(problem, 0.1, solver=solver, criterion=sure, n_iter=4, lr=0.05)
 
     r1 = _run(7)
     r2 = _run(7)

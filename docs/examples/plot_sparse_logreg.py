@@ -10,15 +10,17 @@ the rest of the bilevel machinery is unchanged.
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.datasets import make_classification
-
-from sparho import HeldOutLogistic, L1, LogisticLoss, Problem, hoag_search
+from sparho import L1, HeldOutLogistic, LogisticLoss, Problem, hoag_search
 from sparho.adapters import SklearnLogisticRegression
 
 # %%
 # Binary classification: 250 samples × 50 features, 8 informative.
 X, y01 = make_classification(
-    n_samples=250, n_features=50, n_informative=8,
-    n_redundant=5, random_state=0,
+    n_samples=250,
+    n_features=50,
+    n_informative=8,
+    n_redundant=5,
+    random_state=0,
 )
 # sparho's LogisticLoss expects ±1 labels.
 y = (2 * y01 - 1).astype(np.float64)

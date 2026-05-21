@@ -40,9 +40,9 @@ def _make_dense_problem(n_samples: int = 40, n_features: int = 6):
 
 
 def _make_sparse_problem(n_samples: int = 40, n_features: int = 6, density: float = 0.4):
-    X = sp.random(
-        n_samples, n_features, density=density, format="csc", random_state=11
-    ).astype(np.float64)
+    X = sp.random(n_samples, n_features, density=density, format="csc", random_state=11).astype(
+        np.float64
+    )
     beta = np.zeros(n_features)
     beta[:3] = [1.0, -0.5, 0.7]
     y = (X @ beta) + 0.1 * np.random.default_rng(12).standard_normal(n_samples)
@@ -54,7 +54,7 @@ def _make_sparse_problem(n_samples: int = 40, n_features: int = 6, density: floa
 
 @pytest.mark.parametrize("density", ["dense", "sparse"])
 def test_hoag_weighted_l1_exponential_tol(density: str):
-    X, y = (_make_dense_problem() if density == "dense" else _make_sparse_problem())
+    X, y = _make_dense_problem() if density == "dense" else _make_sparse_problem()
     n_samples, n_features = X.shape
     problem = Problem(SquaredLoss(), WeightedL1(), X, y)
     hp0 = np.full(n_features, 0.05)

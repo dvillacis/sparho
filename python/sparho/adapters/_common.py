@@ -11,7 +11,7 @@ from ..core.types import Array, Hyperparam
 
 def as_scalar(hp: Hyperparam) -> float:
     """Coerce a scalar hyperparameter (Python float, numpy float, or 0-d array)."""
-    if isinstance(hp, (int, float, np.floating)):
+    if isinstance(hp, int | float | np.floating):
         return float(hp)
     arr = cast(np.ndarray, hp)
     if isinstance(arr, np.ndarray) and arr.ndim == 0:

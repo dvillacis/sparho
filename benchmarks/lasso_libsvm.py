@@ -327,9 +327,7 @@ def main() -> int:
         "| LassoCV α* | LassoCV MSE | LassoCV time | LassoCV grid "
         "| speedup |"
     )
-    print(
-        "|---|---|---|---|---|---|---|---|---|---|---|"
-    )
+    print("|---|---|---|---|---|---|---|---|---|---|---|")
     for row in table_rows:
         print(row)
 

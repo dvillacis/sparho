@@ -35,9 +35,7 @@ def block_problem() -> tuple[Problem, np.ndarray]:
     true_beta[0:group_size] = rng.standard_normal(group_size) + 2.0
     true_beta[2 * group_size : 3 * group_size] = rng.standard_normal(group_size) - 2.0
     y = X @ true_beta + 0.05 * rng.standard_normal(n)
-    groups = tuple(
-        tuple(range(k * group_size, (k + 1) * group_size)) for k in range(n_groups)
-    )
+    groups = tuple(tuple(range(k * group_size, (k + 1) * group_size)) for k in range(n_groups))
     penalty = GroupL1(groups=groups)
     crit_w = np.random.default_rng(1).standard_normal(p)
     return Problem(SquaredLoss(), penalty, X, y), crit_w
@@ -205,7 +203,11 @@ def test_implicit_forward_group_l1_closed_form(block_problem):
     result = solver(problem, alpha)
     hg = implicit_forward(problem, alpha, result, crit_w, tol=1e-12)
     cf = _closed_form_group_l1_hypergrad(
-        problem.design, result.coef, problem.penalty, crit_w, alpha  # type: ignore[arg-type]
+        problem.design,
+        result.coef,
+        problem.penalty,
+        crit_w,
+        alpha,  # type: ignore[arg-type]
     )
     assert hg == pytest.approx(cf, rel=1e-4, abs=1e-6)
 

@@ -1,0 +1,93 @@
+name: Perf (Linux isolated)
+
+# `ci-linux-isolated` — the v0.2 ROADMAP committed to a 10 % speedup-ratio
+# reproducibility target on Linux that macOS thermal jitter couldn't hit
+# (see ROADMAP §v0.2 §5 and `benchmarks/README.md` § Reproducibility). This
+# workflow runs the dense-libsvm benchmark under `taskset` (CPU pinning,
+# isolated cores when the runner provides them) with `--repeat 5
+# --cooldown 2`, then enforces a < 10 % wall-time spread on sparho's own
+# row for `leukemia` — i.e., sparho regressions surface as a hard CI
+# failure rather than as noise in a manual measurement.
+#
+# Not on PR by default (libsvm download + benchmark takes minutes); fires
+# on `workflow_dispatch` (manual) and on tags via `release.yml` indirectly
+# (a maintainer can dispatch this against the release tag SHA).
+#
+# Note: GitHub-hosted Linux runners are shared VMs, so "isolated" is best-
+# effort. The intra-run interleaving in `lasso_libsvm.py` (sparho ↔ LassoCV
+# round-robin per rep, `gc.collect()` between iters) is what makes the
+# threshold attainable; taskset just keeps the threads on a single core
+# across reps.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-linux-isolated:
+    name: ci-linux-isolated (leukemia)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install package + bench deps + celer
+        env:
+          MATURIN_PEP517_ARGS: "--profile release"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -v -e ".[bench,celer]"
+          python -m pip install pyperf
+      - name: tune CPU governor (best-effort)
+        run: |
+          # GitHub-hosted runners don't grant `cpupower` / cpuset access,
+          # but `taskset` always works. The `|| true` keeps this step
+          # green when run on a hardened runner.
+          (sudo cpupower frequency-set -g performance || true) 2>&1
+          python -m pyperf system show || true
+      - name: leukemia benchmark (pinned, --repeat 5)
+        run: |
+          taskset -c 0 python benchmarks/lasso_libsvm.py \
+            --datasets leukemia \
+            --solver celer \
+            --repeat 5 \
+            --warmup 1 \
+            --cooldown 2 \
+            --quick \
+            | tee perf.log
+      - name: enforce < 10 % sparho-side wall spread
+        run: |
+          python - <<'PY'
+          import re, sys
+          log = open("perf.log").read()
+          # Bench script's speedup line:
+          #   speedup:  32.78×  spread[sparho]=2.3%  spread[LassoCV]=5.0%
+          # Anything ≥ 10 % on the sparho row fails this job.
+          m = re.search(r"spread\[sparho\]\s*=\s*([\d.]+)\s*%", log)
+          if m is None:
+              print("benchmark output did not include the expected 'spread[sparho]' token")
+              print(log)
+              sys.exit(1)
+          spread = float(m.group(1))
+          print(f"sparho leukemia spread = {spread:.2f}%")
+          if spread >= 10.0:
+              print(f"FAIL: spread {spread:.2f}% >= 10 % threshold")
+              sys.exit(1)
+          print("OK: within reproducibility threshold")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-log
+          path: perf.log
+          if-no-files-found: warn
+          retention-days: 30

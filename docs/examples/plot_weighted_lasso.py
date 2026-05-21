@@ -14,15 +14,17 @@ This is something ``sklearn.LassoCV`` cannot do.
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.datasets import make_regression
-
 from sparho import HeldOutMSE, Problem, SquaredLoss, WeightedL1, hoag_search
 from sparho.adapters import SklearnWeightedLasso
 
 # %%
 # Synthetic data — 200 samples × 40 features, 5 informative.
 X, y = make_regression(
-    n_samples=200, n_features=40, n_informative=5,
-    noise=1.0, random_state=0,
+    n_samples=200,
+    n_features=40,
+    n_informative=5,
+    noise=1.0,
+    random_state=0,
 )
 
 rng = np.random.default_rng(0)
@@ -48,8 +50,10 @@ result = hoag_search(
 alpha_star = np.asarray(result.best_hyperparam)
 nonzero = np.flatnonzero(np.abs(result.best_coef) > 1e-8)
 print(f"|active set| = {nonzero.size}")
-print(f"α (min/median/max): {alpha_star.min():.3g} / "
-      f"{np.median(alpha_star):.3g} / {alpha_star.max():.3g}")
+print(
+    f"α (min/median/max): {alpha_star.min():.3g} / "
+    f"{np.median(alpha_star):.3g} / {alpha_star.max():.3g}"
+)
 
 # %%
 # Visualize the per-feature α vector after the search.

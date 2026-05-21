@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
@@ -13,7 +13,7 @@ from importlib.metadata import version as _pkg_version
 
 project = "sparho"
 author = "David Villacis"
-copyright = f"{datetime.now(tz=timezone.utc).year}, {author}"
+copyright = f"{datetime.now(tz=UTC).year}, {author}"
 
 try:
     release = _pkg_version("sparho")

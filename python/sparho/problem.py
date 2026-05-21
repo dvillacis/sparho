@@ -109,9 +109,7 @@ class GroupL1:
                 raise ValueError(f"GroupL1: group {k} is empty")
             for j in g:
                 if not isinstance(j, int) or j < 0:
-                    raise ValueError(
-                        f"GroupL1: group {k} contains non-negative-int index {j!r}"
-                    )
+                    raise ValueError(f"GroupL1: group {k} contains non-negative-int index {j!r}")
                 if j in seen:
                     raise ValueError(f"GroupL1: feature {j} appears in more than one group")
                 seen.add(j)
@@ -139,9 +137,7 @@ class GroupL1:
         k_max = int(arr.max())
         if int(arr.min()) < 0:
             raise ValueError("group labels must be non-negative")
-        groups = tuple(
-            tuple(int(j) for j in np.flatnonzero(arr == k)) for k in range(k_max + 1)
-        )
+        groups = tuple(tuple(int(j) for j in np.flatnonzero(arr == k)) for k in range(k_max + 1))
         empty = [k for k, g in enumerate(groups) if not g]
         if empty:
             raise ValueError(f"empty groups not allowed; labels missing: {empty}")

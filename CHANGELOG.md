@@ -22,6 +22,29 @@ and Semantic Versioning.
   `tests/test_ffi_safety.py` cover bad CSC structure, out-of-range active
   indices, non-contiguous slices, and bad group partitions.
 
+### CI
+- **CI hardening (v0.4 §2).** PR matrix now includes `windows-latest`
+  (both the rust and python jobs; Windows tested on Python 3.12 with the
+  full Linux/macOS sweep across 3.11–3.13). New `cargo-audit` job
+  (Linux-only; one ignore for the known PyO3 0.22 advisory
+  RUSTSEC-2025-0020 pending an `pyo3 → 0.24` bump). New `pre-commit` job
+  running `pre-commit run --all-files`. New `pytest --doctest-modules
+  python/sparho` step so future doctests are automatically gated. New
+  `ci-celer` job exercising the optional `[celer]` extra. New
+  `ci-min-deps` job pinning `numpy==1.24 / scipy==1.10 /
+  scikit-learn==1.3` so silent floor-version regressions surface on PR.
+  New `.github/workflows/perf.yml` with `ci-linux-isolated`: runs the
+  `leukemia` libsvm benchmark under `taskset -c 0` with `--repeat 5
+  --cooldown 2`, fails the job if sparho's wall-time spread ≥ 10 %
+  (the v0.2 §5 reproducibility target macOS jitter couldn't hit).
+  Triggers on `workflow_dispatch` + tags, not PR.
+  `.github/workflows/release.yml` gained a `wheel_smoke` job (Linux +
+  macOS arm64 + Windows) that downloads each cibuildwheel artifact into
+  a fresh venv and runs `LassoHO().fit(X, y)` end-to-end before the PyPI
+  publish step. `pyproject.toml` per-file-ignores extended for
+  `docs/examples/**` (sphinx-gallery title format conflicts with
+  pydocstyle D205 / D400). Closes ROADMAP v0.4 §2.
+
 ### Tests
 - **Coverage expansion (v0.4 §1).** New `proptest` dev-dependency drives 11
   property suites (~256 cases each) in

@@ -48,9 +48,7 @@ class GroupLassoFista:
         x0: Array | None = None,
         tol: float | None = None,
     ) -> SolverResult:
-        if not isinstance(problem.datafit, SquaredLoss) or not isinstance(
-            problem.penalty, GroupL1
-        ):
+        if not isinstance(problem.datafit, SquaredLoss) or not isinstance(problem.penalty, GroupL1):
             raise TypeError("GroupLassoFista requires Problem(SquaredLoss, GroupL1, ...)")
         alpha = as_scalar(hyperparam)
         if alpha <= 0:
@@ -114,9 +112,7 @@ def _group_layout(penalty: GroupL1) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     sizes = [len(g) for g in penalty.groups]
     group_ptr = np.concatenate([[0], np.cumsum(sizes)]).astype(np.int32)
     if penalty.groups:
-        group_indices = np.concatenate(
-            [np.asarray(g, dtype=np.int32) for g in penalty.groups]
-        )
+        group_indices = np.concatenate([np.asarray(g, dtype=np.int32) for g in penalty.groups])
     else:
         group_indices = np.zeros(0, dtype=np.int32)
     if penalty.weights is not None:

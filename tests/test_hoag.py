@@ -155,9 +155,7 @@ def test_hoag_search_rejects_bad_inputs(reg_dense):
     with pytest.raises(ValueError, match="strictly positive"):
         hoag_search(problem, hp0=-1.0, solver=solver, criterion=cv)
     with pytest.raises(ValueError, match="tolerance_decrease"):
-        hoag_search(
-            problem, hp0=0.1, solver=solver, criterion=cv, tolerance_decrease="bogus"
-        )
+        hoag_search(problem, hp0=0.1, solver=solver, criterion=cv, tolerance_decrease="bogus")
     with pytest.raises(ValueError, match="inner_tol_initial"):
         hoag_search(
             problem,
@@ -209,6 +207,6 @@ def test_hoag_search_descends_through_armijo_stall_zone():
 
     # HOAG should descend from hp0=0.1 by at least one order of magnitude
     # (the stalled-Armijo case would stay at ~0.1).
-    assert float(result.best_hyperparam) < 0.05, (
-        f"HOAG did not descend: best_hp={float(result.best_hyperparam)} (hp0=0.1)"
-    )
+    assert (
+        float(result.best_hyperparam) < 0.05
+    ), f"HOAG did not descend: best_hp={float(result.best_hyperparam)} (hp0=0.1)"

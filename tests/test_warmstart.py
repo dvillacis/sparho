@@ -81,9 +81,9 @@ def test_sklearn_lasso_x0_reduces_iters(reg_dense):
     cold = solver(problem, 0.1)
     # Seed from the true optimum → inner solver should converge in fewer iters.
     warm = solver(problem, 0.1, x0=cold.coef)
-    assert warm.n_iter < cold.n_iter, (
-        f"warm.n_iter={warm.n_iter} not less than cold.n_iter={cold.n_iter}"
-    )
+    assert (
+        warm.n_iter < cold.n_iter
+    ), f"warm.n_iter={warm.n_iter} not less than cold.n_iter={cold.n_iter}"
 
 
 def test_sklearn_elastic_net_x0(reg_dense):
@@ -176,9 +176,7 @@ def test_crossval_warm_start_matches_cold(reg_dense):
         cold_res = cold_cv.value_and_hypergrad(problem, alpha, solver, implicit_forward)
         warm_res = warm_cv.value_and_hypergrad(problem, alpha, solver, implicit_forward)
         np.testing.assert_allclose(warm_res.value, cold_res.value, rtol=1e-6)
-        np.testing.assert_allclose(
-            float(warm_res.hypergrad), float(cold_res.hypergrad), rtol=1e-4
-        )
+        np.testing.assert_allclose(float(warm_res.hypergrad), float(cold_res.hypergrad), rtol=1e-4)
 
 
 def test_crossval_warm_start_value_only(reg_dense):

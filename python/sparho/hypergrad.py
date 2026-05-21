@@ -66,7 +66,7 @@ class _GroupL1ActiveInfo:
 
 
 def _resolved_group_weights(penalty: GroupL1) -> np.ndarray:
-    """Default ``w_k = √|G_k|`` when ``penalty.weights`` is ``None``."""
+    """Resolve per-group weights, falling back to ``w_k = √|G_k|`` when unset."""
     if penalty.weights is not None:
         w = np.asarray(penalty.weights, dtype=np.float64)
         if w.shape != (len(penalty.groups),):
@@ -251,9 +251,7 @@ def _build_hess_matvec(
         case SquaredLoss():
             data_matvec = _build_ls_data_matvec(problem.design, problem.n_samples, active)
         case LogisticLoss():
-            data_matvec = _build_logistic_data_matvec(
-                problem.design, problem.target, beta, active
-            )
+            data_matvec = _build_logistic_data_matvec(problem.design, problem.target, beta, active)
         case _:
             assert_never(datafit)
 

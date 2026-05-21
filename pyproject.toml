@@ -85,6 +85,11 @@ convention = "numpy"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
 "benchmarks/**" = ["D"]
+# sphinx-gallery examples use the title + ``===`` underline convention as
+# the module docstring; that intentionally violates D205 / D400 (no blank
+# line after summary, no terminal period). Drop pydocstyle entirely here —
+# the examples are demo code, not API.
+"docs/examples/**" = ["D"]
 # Adapter / solver / optimizer / criterion classes carry their semantics on
 # the class docstring; the `__call__` / `init` / `value` / `value_and_hypergrad`
 # dispatchers are self-evident from the class doc.

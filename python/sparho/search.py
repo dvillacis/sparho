@@ -58,6 +58,7 @@ def _extras_from_warnings(captured: list[warnings.WarningMessage]) -> dict[str, 
             extras["cg_nonfinite"] = True
     return extras
 
+
 HypergradFn = Callable[..., Hyperparam]
 
 
@@ -284,9 +285,7 @@ def hoag_search(
         # 1. val + grad at current θ with current inner tol.
         with warnings.catch_warnings(record=True) as captured:
             warnings.simplefilter("always")
-            result = criterion.value_and_hypergrad(
-                problem, hp, solver, hypergrad, tol=tol_k
-            )
+            result = criterion.value_and_hypergrad(problem, hp, solver, hypergrad, tol=tol_k)
         for _w in captured:
             warnings.warn_explicit(
                 message=_w.message,
@@ -352,10 +351,7 @@ def hoag_search(
         # 4. Retrospective acceptance test on the PREVIOUS step
         #    (the step that brought us to this θ from θ_pre_last_iter).
         slack_good = (
-            value_prev
-            + C * tol_k
-            + old_tol * (C + factor) * incr
-            - factor * L * incr * incr
+            value_prev + C * tol_k + old_tol * (C + factor) * incr - factor * L * incr * incr
         )
         slack_bad = 1.2 * value_prev
 
@@ -422,9 +418,7 @@ def _as_positive(hp: Hyperparam, n_features: int) -> Hyperparam:
     if isinstance(hp, np.ndarray):
         arr = np.asarray(hp, dtype=np.float64)
         if arr.ndim != 1:
-            raise ValueError(
-                f"hp0 must be a 1-D vector for per-feature α, got ndim={arr.ndim}"
-            )
+            raise ValueError(f"hp0 must be a 1-D vector for per-feature α, got ndim={arr.ndim}")
         if arr.shape[0] != n_features:
             raise ValueError(
                 f"hp0 length ({arr.shape[0]}) must equal problem.n_features ({n_features})"

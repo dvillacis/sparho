@@ -212,8 +212,7 @@ def test_implicit_forward_wlasso_finite_difference(wlasso_problem):
         r_minus = solver(problem, a_minus)
         # Skip the FD if the perturbation changed the active set.
         if not (
-            np.array_equal(r_plus.active_set, active)
-            and np.array_equal(r_minus.active_set, active)
+            np.array_equal(r_plus.active_set, active) and np.array_equal(r_minus.active_set, active)
         ):
             continue
         fd = (np.dot(crit_w, r_plus.coef) - np.dot(crit_w, r_minus.coef)) / (2 * eps)

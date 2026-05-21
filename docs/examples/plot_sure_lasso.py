@@ -69,10 +69,10 @@ print(f"oracle:      α* = {alpha_oracle:.4g}")
 fig, ax = plt.subplots(figsize=(6, 4))
 ax.plot(alphas, oracle_mse, "o-", color="C1", label="oracle pred. MSE (uses true signal)")
 ax.plot(alphas, sure_values, "o-", color="C0", label="SURE (data only)")
-ax.axvline(alpha_sure, color="C0", linestyle="--", alpha=0.5,
-           label=f"sparho α* = {alpha_sure:.2g}")
-ax.axvline(alpha_oracle, color="C1", linestyle="--", alpha=0.5,
-           label=f"oracle α* = {alpha_oracle:.2g}")
+ax.axvline(alpha_sure, color="C0", linestyle="--", alpha=0.5, label=f"sparho α* = {alpha_sure:.2g}")
+ax.axvline(
+    alpha_oracle, color="C1", linestyle="--", alpha=0.5, label=f"oracle α* = {alpha_oracle:.2g}"
+)
 ax.set_xscale("log")
 ax.set_xlabel(r"$\alpha$")
 ax.set_ylabel("estimated prediction MSE")

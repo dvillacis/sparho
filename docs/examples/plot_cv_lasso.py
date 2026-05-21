@@ -16,15 +16,17 @@ from sklearn.datasets import make_regression
 from sklearn.linear_model import LassoCV
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
-
-from sparho import CrossVal, L1, Problem, SquaredLoss, hoag_search
+from sparho import L1, CrossVal, Problem, SquaredLoss, hoag_search
 from sparho.adapters import SklearnLasso
 
 # %%
 # Synthetic data — 300 samples × 80 features, 10 informative.
 X, y = make_regression(
-    n_samples=300, n_features=80, n_informative=10,
-    noise=1.0, random_state=0,
+    n_samples=300,
+    n_features=80,
+    n_informative=10,
+    noise=1.0,
+    random_state=0,
 )
 
 # %%
@@ -45,15 +47,19 @@ result = hoag_search(
     n_iter=20,
 )
 best_alpha = float(result.best_hyperparam)
-print(f"sparho: α = {best_alpha:.4g}   mean CV MSE = "
-      f"{min(r.value for r in result.history):.4f}")
+print(
+    f"sparho: α = {best_alpha:.4g}   mean CV MSE = " f"{min(r.value for r in result.history):.4f}"
+)
 
 # %%
 # LassoCV baseline on a 30-point grid using the same folds.
 alphas_grid = np.logspace(-4, 1, 30)
 cv = LassoCV(
-    alphas=alphas_grid, cv=list(folds), fit_intercept=False,
-    tol=1e-8, max_iter=10_000,
+    alphas=alphas_grid,
+    cv=list(folds),
+    fit_intercept=False,
+    tol=1e-8,
+    max_iter=10_000,
 )
 cv.fit(X, y)
 cv_mse = float(cv.mse_path_.mean(axis=1).min())
@@ -69,8 +75,7 @@ xs = [float(r.hyperparam) for r in result.history]
 ys = [r.value for r in result.history]
 ax.plot(xs, ys, "o-", color="C0", label="sparho HOAG (5-fold CV)")
 ax.axvline(best_alpha, color="C0", linestyle="--", alpha=0.5)
-ax.axvline(cv.alpha_, color="C1", linestyle="--", alpha=0.5,
-           label=f"LassoCV α = {cv.alpha_:.2g}")
+ax.axvline(cv.alpha_, color="C1", linestyle="--", alpha=0.5, label=f"LassoCV α = {cv.alpha_:.2g}")
 ax.set_xscale("log")
 ax.set_xlabel(r"$\alpha$")
 ax.set_ylabel("mean CV MSE")

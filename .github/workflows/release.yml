@@ -99,9 +99,66 @@ jobs:
           name: sdist
           path: dist/*.tar.gz
 
+  wheel_smoke:
+    name: wheel smoke (${{ matrix.os }} ${{ matrix.cibw_archs }})
+    needs: [build_wheels]
+    runs-on: ${{ matrix.os }}
+    # Final gate before PyPI upload: download the platform-matching wheel,
+    # install it in a fresh venv, and confirm a real end-to-end fit works.
+    # cibuildwheel already runs the pytest suite during the wheel build,
+    # but that exercises the *just-built* artifact in the build container.
+    # This step proves the artifact survives the round-trip through the
+    # GitHub artifact store + a fresh interpreter — which is what users
+    # actually do when they `pip install sparho`.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, cibw_archs: x86_64 }
+          - { os: macos-14, cibw_archs: arm64 }
+          - { os: windows-latest, cibw_archs: AMD64 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.cibw_archs }}
+          path: wheelhouse
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install wheel in a fresh venv + smoke fit
+        run: |
+          python -m venv .smoke
+          # shellcheck disable=SC1091
+          if [ -f .smoke/bin/activate ]; then
+            source .smoke/bin/activate
+          else
+            source .smoke/Scripts/activate
+          fi
+          python -m pip install --upgrade pip
+          # ABI3 cp311-* wheel; with python 3.12 above this picks one wheel.
+          python -m pip install wheelhouse/*.whl
+          python -m pip install "numpy>=1.24" "scipy>=1.10" "scikit-learn>=1.3"
+          python - <<'PY'
+          import numpy as np
+          import sparho
+          print("sparho", sparho.__version__, "core", sparho._core.version())
+          rng = np.random.default_rng(0)
+          X = rng.standard_normal((40, 6))
+          beta = np.zeros(6); beta[:2] = [1.0, -0.7]
+          y = X @ beta + 0.1 * rng.standard_normal(40)
+          est = sparho.LassoHO(alpha_init=0.1, n_iter=5).fit(X, y)
+          assert est.coef_.shape == (6,), est.coef_.shape
+          assert np.all(np.isfinite(est.coef_))
+          assert est.alpha_ > 0
+          print("smoke OK: alpha_ =", est.alpha_)
+          PY
+
   publish:
     name: publish to PyPI
-    needs: [build_wheels, build_sdist]
+    needs: [wheel_smoke, build_sdist]
     runs-on: ubuntu-latest
     # Only publish on tag pushes — manual workflow_dispatch runs
     # build wheels but stop short of publishing, so you can dry-run
