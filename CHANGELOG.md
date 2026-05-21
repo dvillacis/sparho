@@ -5,7 +5,86 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+- **FFI hardening (v0.3.1).** Every Rust kernel that previously did a bare
+  `as usize` cast on caller-supplied `i32` indices now validates the input
+  first and returns `Result<(), &'static str>` instead of `assert!`-ing —
+  malformed `scipy.sparse.csc_matrix` data from Python reaches the user as
+  `ValueError`, never as a Rust panic unwinding through CPython (undefined
+  behavior on a release build with `panic = "unwind"`). Affects
+  `csc::{matvec,rmatvec}`, `residual::restricted_ls_hessian_matvec`, and
+  `prox::{prox_l1,prox_jacobian_l1,prox_elastic_net,prox_jacobian_elastic_net,
+  prox_weighted_l1,prox_jacobian_weighted_l1,prox_group_l1}`. The PyO3
+  wrappers in `crates/sparho-py/src/lib.rs` translate each kernel error to
+  `PyValueError`; `PyReadonlyArray1::as_slice()` already required C-contiguity
+  on 1-D inputs. Cargo release profile sets `panic = "abort"` + `strip =
+  true` as the safety net for any remaining bug. 15 new regression tests in
+  `tests/test_ffi_safety.py` cover bad CSC structure, out-of-range active
+  indices, non-contiguous slices, and bad group partitions.
+
+### Tests
+- **Coverage expansion (v0.4 §1).** New `proptest` dev-dependency drives 11
+  property suites (~256 cases each) in
+  `crates/sparho-core/tests/proptests.rs`: prox-kernel algebraic identities
+  (`prox_l1` ≡ elementwise `soft_threshold`, sign preservation +
+  non-expansion, below-threshold zeroing; `prox_elastic_net@rho=1` ≡
+  `prox_l1`; uniform-`α` `prox_weighted_l1` ≡ `prox_l1`; singleton-group
+  `prox_group_l1` ≡ `prox_l1`; block non-expansion), and CSC parity
+  against a dense reference (`csc::matvec`, `csc::rmatvec`,
+  `restricted_ls_hessian_matvec` on the full active set). New pytest
+  files: `tests/test_wrappers_pickle.py` (9 cases: unfit/fit pickle
+  round-trip + `sklearn.clone` for each of LassoHO / ElasticNetHO /
+  LogisticRegressionHO), `tests/test_determinism.py` (3 cases: same
+  `random_state` → bit-identical `SearchResult` for `CrossVal.kfold` and
+  `Sure`; different seeds detect-ably differ), `tests/test_degenerate.py`
+  (6 cases: empty active set, all-zero target, single-class logistic
+  rejection, fully-collinear features, `n ≪ p`), and
+  `tests/test_hoag_schedule.py` (3 cases: `WeightedL1` dense+sparse and
+  `GroupL1` under `hoag_search` + `tolerance_decrease='exponential'`,
+  exercising the rejection branch). Total: 197 pytest (+21 over v0.3.1),
+  33 cargo unit + property tests (+11). Closes ROADMAP v0.4 §1.
+
 ### Added
+- **Input validation (v0.3.1).** `Problem.__post_init__` now enforces
+  `design.ndim == 2`, `target.ndim == 1`, matching first axis, and
+  `np.isfinite` on both (sparse designs check `.data`; opt out globally via
+  `sparho.problem.CHECK_FINITE = False` for masked-input pipelines).
+  `ElasticNet.__post_init__` enforces `rho ∈ (0, 1]`. `GroupL1.__post_init__`
+  validates the partition (disjoint, non-empty groups, non-negative indices,
+  weights length matches groups) at construction — previously this was only
+  checked inside `from_labels`. `grad_search` / `hoag_search` preflight
+  vector-α length against `problem.n_features` before the outer loop starts.
+  `adapters._common.as_scalar` / `as_vector` produce actionable error
+  messages that name the expected shape and point at the right penalty
+  (scalar-α vs WeightedL1). 21 new tests in `tests/test_problem_validation.py`.
+- `IterationRecord.extras: Mapping[str, object]` field — populated by the
+  search loop when implicit-diff fails (`"cg_nonconvergence"`,
+  `"cg_nonfinite"` keys today). Defaults to an empty dict; schema is
+  stability-experimental.
+- `sparho.GroupL1` penalty — Yuan & Lin's block-sparsity regularizer
+  `R(β; α) = α · Σ_k w_k · ‖β_{G_k}‖_2`, with default `w_k = √|G_k|` so the
+  penalty is invariant to group size. New variant of the closed `Penalty`
+  union; mypy strict flags any algorithm that forgets to dispatch on it.
+  Build via `GroupL1(groups=((0, 1), (2, 3, 4), ...))` or the convenience
+  `GroupL1.from_labels(label_array)` factory.
+  `sparho._core.prox_group_l1` is the new Rust block-soft-threshold kernel
+  (allocation-free, CSR-style group layout). `implicit_forward` gains a
+  `case GroupL1()` arm that handles the *block-diagonal* penalty curvature
+  `(α·w_k/r_k)·(I − u_k u_kᵀ)` on each active group — distinct from the
+  uniform-diagonal curvature L1 / ElasticNet / WeightedL1 use. The active
+  set is expanded from "active groups" (groups with `‖β_{G_k}‖ > 0`) so
+  internal-zero coords still enter the KKT system, per the Group-Lasso
+  optimality conditions. `sparho.adapters.GroupLassoFista` is the canonical
+  built-in inner solver — accelerated proximal gradient (Beck-Teboulle 2009)
+  on top of the Rust prox kernel, Lipschitz constant estimated by power
+  iteration (pass `lipschitz=L` to skip when re-fitting many α values on
+  the same design), warm-start via `x0`, KKT-stationarity `dual_gap` proxy.
+  Works with dense and CSC-sparse `X`. 13 new tests in
+  `tests/test_group_lasso.py` (dataclass + `from_labels` round-trip,
+  block-sparse support recovery, ρ-singleton equivalence to plain Lasso,
+  sparse↔dense parity, warm-start invariance, closed-form and FD-validated
+  hypergradients) plus 4 kernel-level tests in `tests/test_kernels.py`.
+  Closes ROADMAP v0.3 §4.
 - `sparho.LassoHO`, `sparho.ElasticNetHO`, `sparho.LogisticRegressionHO` —
   sklearn-compatible wrapper estimators (`BaseEstimator + RegressorMixin /
   ClassifierMixin`). Each exposes `fit` / `predict` / `score` / `coef_` /

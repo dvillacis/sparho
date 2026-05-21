@@ -3,6 +3,12 @@
 //! Naming convention: prefixed flat namespace (no PyO3 submodules) — every
 //! binding lives at `sparho._core.<name>`. The `.pyi` stub at
 //! `python/sparho/_core.pyi` is the source of truth for the public surface.
+//!
+//! Every kernel returns `Result<(), &'static str>`; we translate any error
+//! to `PyValueError` so that malformed inputs from Python never trigger a
+//! Rust panic (the release profile sets `panic = "abort"`, so a stray panic
+//! would terminate the interpreter — that is the safety net, not the error
+//! path).
 
 // PyO3 0.22's `#[pyfunction]` macro expands a `PyResult -> PyResult` round-trip
 // that clippy 1.84+ flags as `useless_conversion`. Crate-level suppression;
@@ -16,6 +22,11 @@ use pyo3::prelude::*;
 /// Return type of every prox-Jacobian binding: `(d prox / d z, d prox / d α)`,
 /// both diagonal-encoded as 1-D float64 arrays.
 type JacobianPair<'py> = (Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>);
+
+/// Map a kernel's `&'static str` error into a `PyValueError`.
+fn map_kernel_err(e: &'static str) -> PyErr {
+    PyValueError::new_err(e)
+}
 
 #[pyfunction]
 fn version() -> &'static str {
@@ -47,7 +58,8 @@ fn prox_l1<'py>(
     let out = PyArray1::<f64>::zeros_bound(py, n, false);
     {
         let mut out_rw = out.readwrite();
-        sparho_core::prox::prox_l1(z_slice, alpha, out_rw.as_slice_mut()?);
+        sparho_core::prox::prox_l1(z_slice, alpha, out_rw.as_slice_mut()?)
+            .map_err(map_kernel_err)?;
     }
     Ok(out)
 }
@@ -70,7 +82,8 @@ fn prox_jacobian_l1<'py>(
             alpha,
             oz_rw.as_slice_mut()?,
             oa_rw.as_slice_mut()?,
-        );
+        )
+        .map_err(map_kernel_err)?;
     }
     Ok((out_z, out_a))
 }
@@ -90,7 +103,8 @@ fn prox_elastic_net<'py>(
     let out = PyArray1::<f64>::zeros_bound(py, n, false);
     {
         let mut out_rw = out.readwrite();
-        sparho_core::prox::prox_elastic_net(z_slice, alpha, rho, out_rw.as_slice_mut()?);
+        sparho_core::prox::prox_elastic_net(z_slice, alpha, rho, out_rw.as_slice_mut()?)
+            .map_err(map_kernel_err)?;
     }
     Ok(out)
 }
@@ -118,7 +132,8 @@ fn prox_jacobian_elastic_net<'py>(
             rho,
             oz_rw.as_slice_mut()?,
             oa_rw.as_slice_mut()?,
-        );
+        )
+        .map_err(map_kernel_err)?;
     }
     Ok((out_z, out_a))
 }
@@ -140,7 +155,8 @@ fn prox_weighted_l1<'py>(
     let out = PyArray1::<f64>::zeros_bound(py, n, false);
     {
         let mut out_rw = out.readwrite();
-        sparho_core::prox::prox_weighted_l1(z_slice, a_slice, out_rw.as_slice_mut()?);
+        sparho_core::prox::prox_weighted_l1(z_slice, a_slice, out_rw.as_slice_mut()?)
+            .map_err(map_kernel_err)?;
     }
     Ok(out)
 }
@@ -169,9 +185,33 @@ fn prox_jacobian_weighted_l1<'py>(
             a_slice,
             oz_rw.as_slice_mut()?,
             oa_rw.as_slice_mut()?,
-        );
+        )
+        .map_err(map_kernel_err)?;
     }
     Ok((out_z, out_a))
+}
+
+#[pyfunction]
+fn prox_group_l1<'py>(
+    py: Python<'py>,
+    z: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    weights: PyReadonlyArray1<'py, f64>,
+    group_ptr: PyReadonlyArray1<'py, i32>,
+    group_indices: PyReadonlyArray1<'py, i32>,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let z_s = z.as_slice()?;
+    let w_s = weights.as_slice()?;
+    let gp_s = group_ptr.as_slice()?;
+    let gi_s = group_indices.as_slice()?;
+    let n = z_s.len();
+    let out = PyArray1::<f64>::zeros_bound(py, n, false);
+    {
+        let mut out_rw = out.readwrite();
+        sparho_core::prox::prox_group_l1(z_s, alpha, w_s, gp_s, gi_s, out_rw.as_slice_mut()?)
+            .map_err(map_kernel_err)?;
+    }
+    Ok(out)
 }
 
 // ---------------------------------------------------------------- csc
@@ -199,7 +239,8 @@ fn csc_matvec<'py>(
             n_samples,
             x_s,
             out_rw.as_slice_mut()?,
-        );
+        )
+        .map_err(map_kernel_err)?;
     }
     Ok(out)
 }
@@ -216,11 +257,15 @@ fn csc_rmatvec<'py>(
     let indices_s = indices.as_slice()?;
     let data_s = data.as_slice()?;
     let y_s = y.as_slice()?;
+    if indptr_s.is_empty() {
+        return Err(PyValueError::new_err("indptr must be non-empty"));
+    }
     let n_features = indptr_s.len() - 1;
     let out = PyArray1::<f64>::zeros_bound(py, n_features, false);
     {
         let mut out_rw = out.readwrite();
-        sparho_core::csc::rmatvec(indptr_s, indices_s, data_s, y_s, out_rw.as_slice_mut()?);
+        sparho_core::csc::rmatvec(indptr_s, indices_s, data_s, y_s, out_rw.as_slice_mut()?)
+            .map_err(map_kernel_err)?;
     }
     Ok(out)
 }
@@ -260,7 +305,8 @@ fn restricted_ls_hessian_matvec<'py>(
             v_s,
             out_rw.as_slice_mut()?,
             &mut scratch,
-        );
+        )
+        .map_err(map_kernel_err)?;
     }
     let _ = py; // kept for the lifetime; explicit usage avoids the unused warning
     Ok(out)
@@ -281,6 +327,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(prox_jacobian_elastic_net, m)?)?;
     m.add_function(wrap_pyfunction!(prox_weighted_l1, m)?)?;
     m.add_function(wrap_pyfunction!(prox_jacobian_weighted_l1, m)?)?;
+    m.add_function(wrap_pyfunction!(prox_group_l1, m)?)?;
     // csc
     m.add_function(wrap_pyfunction!(csc_matvec, m)?)?;
     m.add_function(wrap_pyfunction!(csc_rmatvec, m)?)?;

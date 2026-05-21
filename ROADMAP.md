@@ -179,20 +179,151 @@ the model-surface multipliers from skglm/celer.
    — the log-odds intercept is a separate dof, not a feature-centering
    reduction; users add a constant column or accept the no-intercept
    parameterization.
-4. ⏳ **`MultiTaskLasso` / Group-L1 (`Penalty = L21` or `GroupL1`)** —
-   most-requested structural-sparsity extension. New `Penalty` union
-   variant, Rust block-prox kernel, new `match` arms in
-   `implicit_forward` and every dispatching criterion/adapter. Clean
-   exercise of the closed-union design; required for the genomics
-   (group-LD-aware) and finance (factor-group) use cases. Reference:
-   ADMM-BDA 2024 (arXiv 2603.09546).
-5. ⏳ **`SkglmAdapter` + missing celer adapters** —
+4. ✅ **Group-L1 (`Penalty = GroupL1`)** — landed. New variant of the
+   closed `Penalty` union with default `w_k = √|G_k|`; Rust block-prox
+   kernel (`_core.prox_group_l1`, CSR-style group layout); `case GroupL1()`
+   arm in `implicit_forward` handling the block-diagonal penalty curvature
+   `(α·w_k/r_k)·(I − u_k u_kᵀ)` plus active-set expansion from active
+   groups (so internal-zero coords still enter the KKT system).
+   `sparho.adapters.GroupLassoFista` is the built-in inner solver (FISTA
+   on the Rust prox kernel, power-iteration Lipschitz estimate, warm-start,
+   sparse-X aware). Tests cover dataclass + `from_labels` round-trip,
+   block-sparse support recovery, ρ-singleton ≡ plain Lasso, sparse↔dense
+   parity, warm-start invariance, closed-form + FD-validated
+   hypergradients. `MultiTaskLasso` (matrix-target L_{2,1}) and a
+   `CelerGroupLasso` adapter remain candidates for v0.4 / §5.
+5. ⏳ **`SkglmAdapter` + missing celer adapters** — moved into v0.4 as
+   §5 of the hardening + adapter expansion stage (see below).
    `SkglmAdapter` (MCP / SCAD / SLOPE / Group / Multitask / Huber /
    Poisson / Gamma) plus the celer paths we don't wrap today
    (`celer.MultiTaskLasso`, `celer.GroupLasso`,
    `celer.LogisticRegression`). Zero-algorithm-work way to multiply the
    model surface; mirrors the existing `CelerLasso` / `SklearnLasso`
    adapters. Each ~50–80 LOC.
+
+## v0.3.1 — Safety patch (FFI hardening)
+
+Scope-limited bugfix release. No API change, no behavior change for
+correct inputs. Motivated by a survey that identified two classes of
+defect in the v0.3 line: Rust kernels do bare `as usize` casts on
+caller-supplied `i32` slices without bounds checking
+(`crates/sparho-core/src/{csc,residual,prox}.rs`), so a malformed
+`scipy.sparse.csc_matrix` from Python triggers a Rust panic that
+crosses the FFI as an unhandled unwind (release profile inherits the
+default `panic = "unwind"` — undefined behavior in a CPython extension);
+and the Python boundary lets `Problem` accept NaN/Inf design or target
+without detection, vector-α length mismatches surface deep inside
+adapter calls, and `ElasticNet.rho` invariants are checked downstream
+rather than at construction. Target: 1-week ship.
+
+1. ✅ **FFI safety.** Bounds-check every `as usize` cast in
+   `crates/sparho-core/src/{csc,residual,prox}.rs` (validate `indptr`
+   monotonicity + `indices` in `[0, n_samples)` + `active` /
+   `group_indices` in `[0, n_features)`). Replace kernel `assert!`
+   panics with `Result<(), &'static str>` and translate to
+   `PyValueError` in `crates/sparho-py/src/lib.rs`. Enforce
+   C-contiguity on every `PyReadonlyArray1` input. Set `panic =
+   "abort"` and `strip = true` in the release profile so a stray
+   panic terminates the process cleanly instead of unwinding through
+   CPython.
+2. ✅ **Input validation.** `Problem.__post_init__` shape +
+   finiteness checks (`design.ndim == 2`, `target.ndim == 1`, matching
+   first axis, `np.isfinite` on both — opt-out via a module flag for
+   users with deliberately-NaN-padded data); `ElasticNet.__post_init__`
+   enforces `rho ∈ (0, 1]`; `GroupL1.__post_init__` validates the
+   partition (disjoint groups, indices in range — currently only done
+   inside `from_labels`); vector-α length preflight in
+   `search.py:_as_positive` against `problem.n_features`;
+   `as_scalar` / `as_vector` in `adapters/_common.py` produce
+   actionable error messages that name the expected shape.
+   `IterationRecord` gains an `extras: Mapping[str, object]` field
+   (immutable `MappingProxyType`) so the search loop can capture
+   CG-failure diagnostics (`"cg_nonconvergence"`, `"cg_nonfinite"`)
+   without breaking the record's identity semantics.
+
+Tests: `tests/test_ffi_safety.py` (regression for every malformed input
+path — bad CSC structure, out-of-range active indices, non-contiguous
+slices) and `tests/test_problem_validation.py` (NaN/Inf design+target,
+ndim mismatch, rho out of range, GroupL1 with overlapping groups).
+0.3.1 is regression-only — no coverage expansion beyond the safety
+surface; the broader test push lives in v0.4.
+
+## v0.4 — Hardening + adapter expansion
+
+Broader quality milestone bundling the deferred v0.3 features (§1
+skein, §5 skglm + missing celer adapters) with test coverage, CI
+hardening, observability, and docs polish. The adapter additions reuse
+the validation patterns 0.3.1 installs, so adapter code stays thin.
+
+1. ✅ **Test coverage.** Property tests on Rust kernels via
+   `proptest` (random CSC inputs, random group partitions, random α —
+   1k generated cases per kernel); pickle + `sklearn.clone()`
+   round-trip on each wrapper (required by `Pipeline` and MLflow
+   autolog); bit-identical determinism re-fit at the same
+   `random_state` for `CrossVal.kfold` and `Sure` paths; degenerate
+   inputs (empty problem, all-zero target, single-class for logistic,
+   all-features-collinear, `n < p × 10`); `WeightedL1` and `GroupL1`
+   vector-α under `hoag_search` rejection + exponential-tol schedule.
+2. ⏳ **CI hardening.** Add `windows-latest` to the `python` + `rust`
+   PR CI matrix (wheels already ship to Windows via cibuildwheel but
+   were never PR-tested). Add a wheel-import smoke step in
+   `release.yml` between cibuildwheel and PyPI upload that extracts
+   each artifact, instantiates a fresh venv, and runs
+   `python -c "import sparho; sparho.LassoHO().fit(X, y)"`. New
+   matrix jobs: `ci-celer` exercising the optional extra,
+   `ci-min-deps` pinning numpy==1.24 / scipy==1.10 /
+   scikit-learn==1.3 to catch silent floor-version regressions, and
+   `ci-linux-isolated` running `pyperf --isolated` + `taskset` to
+   hit the 10 % speedup-ratio target the v0.2 reproducibility
+   section deferred. Add `cargo audit`, `pre-commit run --all-files`,
+   and `pytest --doctest-modules python/sparho` steps.
+3. ⏳ **Observability.** Optional
+   `callback: Callable[[IterationRecord], None] | None` on
+   `grad_search` / `hoag_search` (default `None`, current behavior
+   unchanged) called after every accepted outer iter — enables live
+   plotting, progress bars, custom early-stopping.
+   `IterationRecord.extras` (added in 0.3.1) gets populated with
+   `cg_status`, `inner_dual_gap`, `step_size`, `L_estimate`. New
+   `verbose: int = 0` knob on `LassoHO` / `ElasticNetHO` /
+   `LogisticRegressionHO` that wires a default `_VerbosePrinter`
+   callback. The `extras` schema is documented as
+   stability-experimental in `docs/stability.md`.
+4. ⏳ **`sparho.adapters.skein`** (was v0.3 §1) — adapter for skein's
+   nonconvex weighted/group penalties. Prerequisite research spike:
+   does skein expose enough KKT state (active set + KKT residual)
+   for our implicit-diff linearization, or do we need to upstream a
+   `kkt_residual` / `active_set` return in skein first? Adapter is a
+   thin protocol shim, not a port.
+5. ⏳ **`SkglmAdapter` + missing celer adapters** (was v0.3 §5) —
+   `SkglmAdapter` (MCP / SCAD / SLOPE / Group / Multitask / Huber /
+   Poisson / Gamma) plus `CelerMultiTaskLasso`, `CelerGroupLasso`,
+   `CelerLogisticRegression`. Each ~50–80 LOC; pure adapters with no
+   algorithm work.
+6. ⏳ **Docs & community surface.** `CONTRIBUTING.md` (dev setup via
+   `uv sync --extra dev` + `maturin develop`, the mypy / clippy /
+   ruff gates, the pre-commit install requirement), `SECURITY.md`
+   (vulnerability path), `.github/ISSUE_TEMPLATE/{bug,feature}.md`
+   and `.github/PULL_REQUEST_TEMPLATE.md`. New `docs/stability.md`
+   declaring frozen-stable surface (`Problem`, the `Penalty` /
+   `Datafit` unions, the `Solver` protocol, `grad_search` /
+   `hoag_search`, the three sklearn wrappers) vs. experimental
+   (adapter internals, `IterationRecord.extras` schema, the celer
+   extra) vs. private (everything under `_` prefix, `_core`). New
+   sphinx-gallery example `docs/examples/plot_group_lasso.py`
+   (currently missing — Group-L1 shipped in v0.3 §4) and
+   `docs/examples/plot_migration_from_sparse_ho.py` (a runnable
+   side-by-side translation that couples the prose migration guide
+   to a verified example). `pyproject.toml [project.urls]` gains
+   `Documentation` (RTD), `Issues` (GitHub), `Changelog` (GitHub) —
+   the metadata PyPI uses for discoverability.
+
+**Out of scope for both stages (and remain so):**
+sklearn `sample_weight` (separate ROADMAP item M); sparse-aware
+intercept centering for the wrappers (deferred to a focused future
+milestone in v0.3 §3 — touches the inner-solver + hypergradient stack
+meaningfully); GIL release / multi-threading inside Rust kernels
+(v0.5 perf, not hardening); performance optimization in general — the
+Linux-isolated CI job is observability, not optimization.
 
 ## v0.1 work that already landed beyond plan scope
 

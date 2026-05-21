@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import assert_never
 
 import numpy as np
@@ -33,6 +34,7 @@ from .core.types import Array, Hyperparam
 from .problem import (
     L1,
     ElasticNet,
+    GroupL1,
     LogisticLoss,
     Problem,
     SquaredLoss,
@@ -44,6 +46,73 @@ _MatVec = Callable[[np.ndarray], np.ndarray]
 
 
 _DEFAULT_RIDGE_REL = 1e-10
+
+
+@dataclass(frozen=True, slots=True)
+class _GroupL1ActiveInfo:
+    """Precomputed active-group structure used across hypergrad helpers.
+
+    ``active_features`` is the union of features in active groups, laid out
+    one group at a time so ``group_starts[k]:group_starts[k+1]`` slices the
+    block belonging to the ``k``-th *active* group. ``u_concat`` stores
+    ``β_{G_k}/‖β_{G_k}‖`` in the same layout.
+    """
+
+    active_features: np.ndarray  # int32, length |A|
+    group_starts: np.ndarray  # int32, length n_active_groups + 1
+    u_concat: np.ndarray  # float64, length |A|
+    group_norms: np.ndarray  # float64, length n_active_groups
+    weights: np.ndarray  # float64, length n_active_groups
+
+
+def _resolved_group_weights(penalty: GroupL1) -> np.ndarray:
+    """Default ``w_k = √|G_k|`` when ``penalty.weights`` is ``None``."""
+    if penalty.weights is not None:
+        w = np.asarray(penalty.weights, dtype=np.float64)
+        if w.shape != (len(penalty.groups),):
+            raise ValueError(
+                f"GroupL1.weights length ({w.shape[0]}) must equal len(groups) "
+                f"({len(penalty.groups)})"
+            )
+        return w
+    return np.asarray([np.sqrt(len(g)) for g in penalty.groups], dtype=np.float64)
+
+
+def _resolve_group_l1_active(penalty: GroupL1, coef: np.ndarray) -> _GroupL1ActiveInfo:
+    """Active groups by ``‖β_{G_k}‖ > 0``, with all coords of each active group included.
+
+    Group Lasso's prox produces "whole-block" sparsity generically: either
+    ``β_{G_k} = 0`` or ``β_{G_k} ≠ 0`` componentwise. Internal-zero coords inside
+    an active group still need to enter the implicit-diff active set (the
+    KKT identity ties them to the active-group subgradient), so we expand
+    here from the per-group norm rather than ``flatnonzero(coef)``.
+    """
+    weights = _resolved_group_weights(penalty)
+    active_feats: list[int] = []
+    starts: list[int] = [0]
+    u_chunks: list[np.ndarray] = []
+    norms: list[float] = []
+    w_active: list[float] = []
+    for k, g in enumerate(penalty.groups):
+        idx = np.fromiter(g, dtype=np.int64, count=len(g))
+        beta_g = coef[idx]
+        norm_g = float(np.linalg.norm(beta_g))
+        if norm_g == 0.0:
+            continue
+        active_feats.extend(int(j) for j in idx)
+        u_chunks.append(beta_g / norm_g)
+        norms.append(norm_g)
+        w_active.append(float(weights[k]))
+        starts.append(len(active_feats))
+    return _GroupL1ActiveInfo(
+        active_features=np.asarray(active_feats, dtype=np.int32),
+        group_starts=np.asarray(starts, dtype=np.int32),
+        u_concat=(
+            np.concatenate(u_chunks).astype(np.float64) if u_chunks else np.zeros(0, np.float64)
+        ),
+        group_norms=np.asarray(norms, dtype=np.float64),
+        weights=np.asarray(w_active, dtype=np.float64),
+    )
 
 
 def implicit_forward(
@@ -90,9 +159,18 @@ def implicit_forward(
         Scalar for ``L1`` / ``ElasticNet``; ``(n_features,)`` array for
         ``WeightedL1`` (entries outside the active set are exactly zero).
     """
-    active = solver_result.active_set
     n_features = problem.n_features
     penalty = problem.penalty
+
+    # GroupL1 has a different active-set semantics ("active groups expanded to
+    # all their coords") than the per-feature penalties; resolve it here.
+    group_info: _GroupL1ActiveInfo | None
+    if isinstance(penalty, GroupL1):
+        group_info = _resolve_group_l1_active(penalty, solver_result.coef)
+        active = group_info.active_features
+    else:
+        group_info = None
+        active = solver_result.active_set
 
     # Empty active set ⇒ β* doesn't move under small α perturbations,
     # so dC/dα = ∂C/∂α (which we treat as zero — criteria depending only
@@ -107,8 +185,8 @@ def implicit_forward(
     grad_C_A = np.ascontiguousarray(criterion_grad_beta[active], dtype=np.float64)
     sign_A = np.sign(beta_A)
 
-    matvec_raw = _build_hess_matvec(problem, hyperparam, active, beta)
-    ridge_eps = _resolve_ridge(ridge, problem, hyperparam, active, beta)
+    matvec_raw = _build_hess_matvec(problem, hyperparam, active, beta, group_info)
+    ridge_eps = _resolve_ridge(ridge, problem, hyperparam, active, beta, group_info)
     matvec = _ridge_wrap(matvec_raw, ridge_eps)
     n_active = active.size
     op = LinearOperator((n_active, n_active), matvec=matvec, dtype=np.float64)
@@ -138,6 +216,14 @@ def implicit_forward(
             out = np.zeros(n_features, dtype=np.float64)
             out[active] = -sign_A * v
             return np.asarray(out, dtype=np.float64)
+        case GroupL1():
+            assert group_info is not None  # set above when isinstance(penalty, GroupL1)
+            jac_alpha = np.empty_like(v)
+            starts = group_info.group_starts
+            for k_idx, w_k in enumerate(group_info.weights):
+                s, e = int(starts[k_idx]), int(starts[k_idx + 1])
+                jac_alpha[s:e] = w_k * group_info.u_concat[s:e]
+            return float(-np.dot(jac_alpha, v))
         case _:
             assert_never(penalty)
 
@@ -147,22 +233,19 @@ def _build_hess_matvec(
     hyperparam: Hyperparam,
     active: np.ndarray,
     beta: np.ndarray,
+    group_info: _GroupL1ActiveInfo | None = None,
 ) -> _MatVec:
     """Construct the augmented Hessian–vector callback restricted to ``active``.
 
-    ``M_AA · v = H_L,AA · v + diag(∂²R/∂β²)|_A · v``.
+    ``M_AA · v = H_L,AA · v + ∂²R/∂β²|_A · v``.
+
+    For L1 / WeightedL1 the penalty curvature is zero; for ElasticNet it's a
+    uniform diagonal ``α·(1−ρ)·I``; for GroupL1 it's *block-diagonal*: each
+    active group ``G_k`` contributes ``(α·w_k/r_k) · (I − u_k u_kᵀ)``. The
+    GroupL1 case requires the precomputed ``group_info``.
     """
     datafit = problem.datafit
     penalty = problem.penalty
-
-    # Penalty curvature on A (uniform diagonal for v0.1's separable penalties).
-    match penalty:
-        case L1() | WeightedL1():
-            penalty_curv = 0.0
-        case ElasticNet(rho=rho):
-            penalty_curv = float(np.asarray(hyperparam)) * (1.0 - rho)
-        case _:
-            assert_never(penalty)
 
     match datafit:
         case SquaredLoss():
@@ -174,13 +257,39 @@ def _build_hess_matvec(
         case _:
             assert_never(datafit)
 
-    if penalty_curv == 0.0:
-        return data_matvec
+    # Penalty curvature on A.
+    match penalty:
+        case L1() | WeightedL1():
+            return data_matvec
+        case ElasticNet(rho=rho):
+            penalty_curv = float(np.asarray(hyperparam)) * (1.0 - rho)
 
-    def matvec(v: np.ndarray) -> np.ndarray:
-        return data_matvec(v) + penalty_curv * v
+            def matvec_uniform(v: np.ndarray) -> np.ndarray:
+                return data_matvec(v) + penalty_curv * v
 
-    return matvec
+            return matvec_uniform
+        case GroupL1():
+            assert group_info is not None  # required for GroupL1 path
+            alpha = float(np.asarray(hyperparam))
+            starts = group_info.group_starts
+            u_concat = group_info.u_concat
+            weights = group_info.weights
+            norms = group_info.group_norms
+
+            def matvec_group(v: np.ndarray) -> np.ndarray:
+                out = data_matvec(v).copy()
+                for k_idx in range(weights.size):
+                    s, e = int(starts[k_idx]), int(starts[k_idx + 1])
+                    u_k = u_concat[s:e]
+                    v_k = v[s:e]
+                    scale = alpha * weights[k_idx] / norms[k_idx]
+                    # (I − u_k u_kᵀ) v_k = v_k − (u_k·v_k) u_k.
+                    out[s:e] += scale * (v_k - (u_k @ v_k) * u_k)
+                return out
+
+            return matvec_group
+        case _:
+            assert_never(penalty)
 
 
 def _resolve_ridge(
@@ -189,6 +298,7 @@ def _resolve_ridge(
     hyperparam: Hyperparam,
     active: np.ndarray,
     beta: np.ndarray,
+    group_info: _GroupL1ActiveInfo | None = None,
 ) -> float:
     """Resolve the Tikhonov ε for ``M_AA + ε·I``.
 
@@ -216,6 +326,19 @@ def _resolve_ridge(
             penalty_curv = 0.0
         case ElasticNet(rho=rho):
             penalty_curv = float(np.asarray(hyperparam)) * (1.0 - rho)
+        case GroupL1():
+            assert group_info is not None
+            # Block-projection trace per group is ``(|G_k| − 1) · α w_k / r_k``;
+            # averaged across all |A| active features gives the operator's natural
+            # diagonal scale.
+            if active.size == 0:
+                penalty_curv = 0.0
+            else:
+                alpha = float(np.asarray(hyperparam))
+                starts = group_info.group_starts
+                sizes = np.diff(starts).astype(np.float64)
+                trace_blocks = (sizes - 1.0) * alpha * group_info.weights / group_info.group_norms
+                penalty_curv = float(trace_blocks.sum() / active.size)
         case _:
             assert_never(penalty)
 

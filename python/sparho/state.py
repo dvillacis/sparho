@@ -7,6 +7,7 @@ mutable monitor.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -49,13 +50,22 @@ class SolverResult:
 
 @dataclass(frozen=True, slots=True)
 class IterationRecord:
-    """One outer-loop snapshot. Tuples of these form a ``SearchResult.history``."""
+    """One outer-loop snapshot. Tuples of these form a ``SearchResult.history``.
+
+    ``extras`` is a mapping of optional diagnostics keyed by short strings
+    (e.g. ``"cg_nonconvergence"``, ``"cg_nonfinite"``) — populated by the
+    search loop when implicit-diff fails. The schema is
+    stability-experimental (see ``docs/stability.md``). Defaults to an empty
+    dict; treat it as read-only — the record is frozen, but Python can't
+    enforce mapping immutability without breaking ``pickle`` on 3.11.
+    """
 
     iteration: int
     hyperparam: Hyperparam
     value: float
     grad_norm: float
     n_inner_iter: int
+    extras: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

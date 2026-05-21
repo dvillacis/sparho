@@ -4,6 +4,8 @@
 //! ElasticNet, WeightedLasso). Logistic loss adds a sample-weighted diagonal
 //! and is deferred — the Python layer may densify locally for logistic.
 
+use crate::csc::validate_csc;
+
 /// ``H_AA · v`` where ``H = X^T X`` and ``X`` is CSC; ``A`` is `active`.
 ///
 /// Two-pass implementation: ``y = X_A · v`` into `scratch` (dense
@@ -19,10 +21,24 @@ pub fn restricted_ls_hessian_matvec(
     v: &[f64],
     out: &mut [f64],
     scratch: &mut [f64],
-) {
-    assert_eq!(active.len(), v.len());
-    assert_eq!(active.len(), out.len());
-    assert_eq!(scratch.len(), n_samples);
+) -> Result<(), &'static str> {
+    validate_csc(indptr, indices, data, n_samples)?;
+    if active.len() != v.len() {
+        return Err("active and v must have the same length");
+    }
+    if active.len() != out.len() {
+        return Err("out length must equal active length");
+    }
+    if scratch.len() != n_samples {
+        return Err("scratch length must equal n_samples");
+    }
+    let n_features_i =
+        i32::try_from(indptr.len() - 1).map_err(|_| "n_features too large for i32")?;
+    for &j in active.iter() {
+        if j < 0 || j >= n_features_i {
+            return Err("active entry out of range [0, n_features)");
+        }
+    }
     for s in scratch.iter_mut() {
         *s = 0.0;
     }
@@ -51,6 +67,7 @@ pub fn restricted_ls_hessian_matvec(
         }
         out[idx] = sum;
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -91,7 +108,8 @@ mod tests {
                 &v,
                 &mut out,
                 &mut scratch,
-            );
+            )
+            .unwrap();
             assert_eq!(out, *expected);
         }
     }
@@ -113,7 +131,8 @@ mod tests {
             &v,
             &mut out,
             &mut scratch,
-        );
+        )
+        .unwrap();
         assert_eq!(out, vec![1.0, 4.0]);
         v = vec![0.0, 1.0];
         restricted_ls_hessian_matvec(
@@ -125,7 +144,48 @@ mod tests {
             &v,
             &mut out,
             &mut scratch,
-        );
+        )
+        .unwrap();
         assert_eq!(out, vec![4.0, 41.0]);
+    }
+
+    #[test]
+    fn rejects_out_of_range_active() {
+        let (indptr, indices, data) = fixture();
+        let active = [5i32]; // n_features = 3
+        let v = vec![1.0];
+        let mut out = vec![0.0; 1];
+        let mut scratch = vec![0.0; 3];
+        assert!(restricted_ls_hessian_matvec(
+            &indptr,
+            &indices,
+            &data,
+            3,
+            &active,
+            &v,
+            &mut out,
+            &mut scratch,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_negative_active() {
+        let (indptr, indices, data) = fixture();
+        let active = [-1i32];
+        let v = vec![1.0];
+        let mut out = vec![0.0; 1];
+        let mut scratch = vec![0.0; 3];
+        assert!(restricted_ls_hessian_matvec(
+            &indptr,
+            &indices,
+            &data,
+            3,
+            &active,
+            &v,
+            &mut out,
+            &mut scratch,
+        )
+        .is_err());
     }
 }

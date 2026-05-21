@@ -16,16 +16,27 @@ def as_scalar(hp: Hyperparam) -> float:
     arr = cast(np.ndarray, hp)
     if isinstance(arr, np.ndarray) and arr.ndim == 0:
         return float(arr)
-    raise TypeError(f"expected scalar hyperparameter, got shape {np.asarray(hp).shape}")
+    actual = np.asarray(hp).shape
+    raise TypeError(
+        f"expected scalar hyperparameter α (Python float or 0-d ndarray), "
+        f"got ndarray of shape {actual}; this adapter only supports the scalar-α "
+        "penalties (L1 / ElasticNet / GroupL1) — use a WeightedL1 adapter for "
+        "per-feature α"
+    )
 
 
 def as_vector(hp: Hyperparam, n_features: int) -> Array:
     """Coerce a per-feature hyperparameter vector of length ``n_features``."""
     arr = np.asarray(hp, dtype=np.float64)
-    if arr.ndim != 1 or arr.shape[0] != n_features:
+    if arr.ndim != 1:
         raise TypeError(
-            f"expected per-feature hyperparameter of shape ({n_features},), "
-            f"got {arr.shape}"
+            f"expected per-feature α as a 1-D ndarray of shape ({n_features},), "
+            f"got ndim={arr.ndim} (shape {arr.shape}); this adapter is for WeightedL1"
+        )
+    if arr.shape[0] != n_features:
+        raise TypeError(
+            f"per-feature α length mismatch: expected ({n_features},) to match "
+            f"design.shape[1], got ({arr.shape[0]},)"
         )
     return arr
 

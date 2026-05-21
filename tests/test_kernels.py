@@ -131,6 +131,55 @@ def test_prox_weighted_l1_length_mismatch_raises():
         _core.prox_weighted_l1(np.zeros(3), np.zeros(4))
 
 
+# ---------------------------------------------------------------- prox GroupL1
+
+
+def test_prox_group_l1_reduces_to_l1_with_singleton_groups():
+    rng = np.random.default_rng(8)
+    z = rng.standard_normal(20)
+    alpha = 0.3
+    weights = np.ones(20, dtype=np.float64)
+    group_ptr = np.arange(21, dtype=np.int32)
+    group_indices = np.arange(20, dtype=np.int32)
+    out_grp = _core.prox_group_l1(z, alpha, weights, group_ptr, group_indices)
+    out_l1 = _core.prox_l1(z, alpha)
+    np.testing.assert_allclose(out_grp, out_l1, rtol=1e-14, atol=1e-15)
+
+
+def test_prox_group_l1_block_soft_threshold_formula():
+    """For one group: shrink = max(0, 1 − α·w/‖z‖); output = shrink · z."""
+    rng = np.random.default_rng(9)
+    z = rng.standard_normal(7)
+    alpha = 0.2
+    w = np.array([np.sqrt(7.0)])
+    norm = float(np.linalg.norm(z))
+    shrink = max(0.0, 1.0 - alpha * float(w[0]) / norm)
+    expected = shrink * z
+    group_ptr = np.array([0, 7], dtype=np.int32)
+    group_indices = np.arange(7, dtype=np.int32)
+    out = _core.prox_group_l1(z, alpha, w, group_ptr, group_indices)
+    np.testing.assert_allclose(out, expected, rtol=1e-12, atol=1e-13)
+
+
+def test_prox_group_l1_zeros_group_below_threshold():
+    z = np.array([0.1, -0.1, 0.1])  # ‖z‖ = √0.03 ≈ 0.173
+    alpha = 1.0  # alpha*w = 1.0 > 0.173 ⇒ kill the group
+    weights = np.array([1.0])
+    group_ptr = np.array([0, 3], dtype=np.int32)
+    group_indices = np.array([0, 1, 2], dtype=np.int32)
+    out = _core.prox_group_l1(z, alpha, weights, group_ptr, group_indices)
+    np.testing.assert_array_equal(out, np.zeros(3))
+
+
+def test_prox_group_l1_bad_ptr_length_raises():
+    z = np.zeros(3)
+    weights = np.ones(2)
+    group_ptr = np.array([0, 1, 2, 3], dtype=np.int32)  # length 4 ≠ K+1 = 3
+    group_indices = np.array([0, 1, 2], dtype=np.int32)
+    with pytest.raises(ValueError):
+        _core.prox_group_l1(z, 0.1, weights, group_ptr, group_indices)
+
+
 # ---------------------------------------------------------------- CSC
 
 

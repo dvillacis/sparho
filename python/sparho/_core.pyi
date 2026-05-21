@@ -23,6 +23,13 @@ def prox_jacobian_elastic_net(
 ) -> tuple[_F64, _F64]: ...
 def prox_weighted_l1(z: _F64, alpha: _F64) -> _F64: ...
 def prox_jacobian_weighted_l1(z: _F64, alpha: _F64) -> tuple[_F64, _F64]: ...
+def prox_group_l1(
+    z: _F64,
+    alpha: float,
+    weights: _F64,
+    group_ptr: _I32,
+    group_indices: _I32,
+) -> _F64: ...
 
 # csc sparse matrix–vector
 def csc_matvec(

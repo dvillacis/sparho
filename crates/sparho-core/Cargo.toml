@@ -11,5 +11,12 @@ ndarray = { workspace = true }
 num-traits = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+# Property-based testing — kernel invariants on ~256 cases per test.
+# 1k would be nicer but inflates `cargo test` wall-time noticeably on CI;
+# 256 is plenty to surface the integer-cast + range-check classes of bug
+# the v0.3.1 hardening targeted.
+proptest = "1"
+
 [features]
 default = []

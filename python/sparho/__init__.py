@@ -22,6 +22,7 @@ from .problem import (
     L1,
     Datafit,
     ElasticNet,
+    GroupL1,
     LogisticLoss,
     Penalty,
     Problem,
@@ -51,6 +52,7 @@ __all__ = [
     # problem
     "Datafit",
     "ElasticNet",
+    "GroupL1",
     "L1",
     "LogisticLoss",
     "Penalty",

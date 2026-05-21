@@ -19,3 +19,8 @@ thiserror = "1"
 lto = "thin"
 codegen-units = 1
 debug = "line-tables-only"
+# Unwinding a Rust panic across the CPython FFI boundary is undefined behavior;
+# kernels validate inputs and return `Result`, but `panic = "abort"` is the
+# safety net for any remaining bug.
+panic = "abort"
+strip = true

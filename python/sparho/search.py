@@ -39,6 +39,25 @@ from .problem import Problem
 from .solver import Solver
 from .state import IterationRecord, SearchResult
 
+
+def _extras_from_warnings(captured: list[warnings.WarningMessage]) -> dict[str, object]:
+    """Translate captured RuntimeWarnings from ``implicit_forward`` into extras."""
+    extras: dict[str, object] = {}
+    for w in captured:
+        if not issubclass(w.category, RuntimeWarning):
+            continue
+        msg = str(w.message)
+        if "CG failed" in msg:
+            # The warning text encodes both info!=0 (non-convergence) and the
+            # finite check; pull both out so downstream tooling can tell which.
+            if "finite=False" in msg:
+                extras["cg_nonfinite"] = True
+            else:
+                extras["cg_nonconvergence"] = True
+        elif "non-finite hypergradient" in msg or "non-finite gradient" in msg:
+            extras["cg_nonfinite"] = True
+    return extras
+
 HypergradFn = Callable[..., Hyperparam]
 
 
@@ -89,7 +108,7 @@ def grad_search(
     -------
     SearchResult
     """
-    hp0_pos = _as_positive(hp0)
+    hp0_pos = _as_positive(hp0, problem.n_features)
     theta = _log(hp0_pos)
 
     history: list[IterationRecord] = []
@@ -99,7 +118,18 @@ def grad_search(
 
     for k in range(n_iter):
         hp = _exp(theta)
-        result = criterion.value_and_hypergrad(problem, hp, solver, hypergrad)
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.simplefilter("always")
+            result = criterion.value_and_hypergrad(problem, hp, solver, hypergrad)
+        # Re-emit captured warnings so the user still sees them.
+        for _w in captured:
+            warnings.warn_explicit(
+                message=_w.message,
+                category=_w.category,
+                filename=_w.filename,
+                lineno=_w.lineno,
+            )
+        extras = _extras_from_warnings(captured)
         # Chain rule: ``dC/dθ = dC/dα · α`` (elementwise for vector α).
         hg_theta = _elementwise_mul(result.hypergrad, hp)
         grad_norm = _norm(hg_theta)
@@ -115,6 +145,7 @@ def grad_search(
                 value=result.value,
                 grad_norm=grad_norm,
                 n_inner_iter=0,
+                extras=extras,
             )
         )
 
@@ -229,7 +260,7 @@ def hoag_search(
     if n_iter < 1:
         raise ValueError("n_iter must be ≥ 1")
 
-    hp0_pos = _as_positive(hp0)
+    hp0_pos = _as_positive(hp0, problem.n_features)
     theta = _log(hp0_pos)
     is_array = isinstance(theta, np.ndarray)
 
@@ -251,9 +282,19 @@ def hoag_search(
         hp = _exp(theta)
 
         # 1. val + grad at current θ with current inner tol.
-        result = criterion.value_and_hypergrad(
-            problem, hp, solver, hypergrad, tol=tol_k
-        )
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.simplefilter("always")
+            result = criterion.value_and_hypergrad(
+                problem, hp, solver, hypergrad, tol=tol_k
+            )
+        for _w in captured:
+            warnings.warn_explicit(
+                message=_w.message,
+                category=_w.category,
+                filename=_w.filename,
+                lineno=_w.lineno,
+            )
+        extras = _extras_from_warnings(captured)
         value = result.value
         grad = _elementwise_mul(result.hypergrad, hp)  # dC/dθ = dC/dα · α
         grad_norm = _norm(grad)
@@ -265,6 +306,7 @@ def hoag_search(
                 value=value,
                 grad_norm=grad_norm,
                 n_inner_iter=0,
+                extras=extras,
             )
         )
         if np.isfinite(value) and value < best_value:
@@ -328,9 +370,19 @@ def hoag_search(
             L *= 2.0
             theta = theta_pre
             tol_retry = tol_k * 0.5
-            result = criterion.value_and_hypergrad(
-                problem, _exp(theta), solver, hypergrad, tol=tol_retry
-            )
+            with warnings.catch_warnings(record=True) as captured_retry:
+                warnings.simplefilter("always")
+                result = criterion.value_and_hypergrad(
+                    problem, _exp(theta), solver, hypergrad, tol=tol_retry
+                )
+            for _w in captured_retry:
+                warnings.warn_explicit(
+                    message=_w.message,
+                    category=_w.category,
+                    filename=_w.filename,
+                    lineno=_w.lineno,
+                )
+            extras_retry = _extras_from_warnings(captured_retry)
             value = result.value
             grad = _elementwise_mul(result.hypergrad, _exp(theta))
             grad_norm = _norm(grad)
@@ -340,6 +392,7 @@ def hoag_search(
                 value=value,
                 grad_norm=grad_norm,
                 n_inner_iter=0,
+                extras=extras_retry,
             )
             if np.isfinite(value) and value < best_value:
                 best_value = value
@@ -364,10 +417,18 @@ def hoag_search(
 # ---------------------------------------------------------------- helpers
 
 
-def _as_positive(hp: Hyperparam) -> Hyperparam:
-    """Validate ``hp > 0`` and return a contiguous float64 copy."""
+def _as_positive(hp: Hyperparam, n_features: int) -> Hyperparam:
+    """Validate ``hp > 0`` and (for vector-α) length match against ``n_features``."""
     if isinstance(hp, np.ndarray):
         arr = np.asarray(hp, dtype=np.float64)
+        if arr.ndim != 1:
+            raise ValueError(
+                f"hp0 must be a 1-D vector for per-feature α, got ndim={arr.ndim}"
+            )
+        if arr.shape[0] != n_features:
+            raise ValueError(
+                f"hp0 length ({arr.shape[0]}) must equal problem.n_features ({n_features})"
+            )
         if np.any(arr <= 0):
             raise ValueError("hp0 must be strictly positive componentwise")
         return arr

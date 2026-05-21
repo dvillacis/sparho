@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .callable import as_solver
 from .celer import CelerElasticNet, CelerLasso
+from .group_lasso import GroupLassoFista
 from .sklearn import (
     SklearnElasticNet,
     SklearnLasso,
@@ -14,6 +15,7 @@ from .sklearn import (
 __all__ = [
     "CelerElasticNet",
     "CelerLasso",
+    "GroupLassoFista",
     "SklearnElasticNet",
     "SklearnLasso",
     "SklearnLogisticRegression",
