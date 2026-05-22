@@ -325,6 +325,131 @@ meaningfully); GIL release / multi-threading inside Rust kernels
 (v0.5 perf, not hardening); performance optimization in general — the
 Linux-isolated CI job is observability, not optimization.
 
+## v0.5 — Citation infrastructure
+
+First step in the multi-quarter push to make sparho citable + research-
+grade without adding algorithms, writing a manuscript, or installing
+sparse-ho for head-to-head benchmarks. Full plan: `~/.claude/plans/
+i-dont-want-to-happy-manatee.md`. ~1 week.
+
+1. ⏳ **`CITATION.cff` + `.zenodo.json`** — schema 1.2.0 citation file
+   with ORCID; mirrored Zenodo metadata so a tagged release mints a DOI
+   via the GitHub–Zenodo integration. README gains a "How to cite"
+   block and DOI badge.
+2. ⏳ **`CODE_OF_CONDUCT.md`** — Contributor Covenant 2.1 verbatim.
+   Required by JOSS and expected by reviewers; missing from v0.4 §6.
+3. ⏳ **`RELEASE.md` Zenodo procedure** — document the one-time
+   GitHub–Zenodo integration setup and the per-release tag protocol so
+   DOI minting doesn't bit-rot.
+4. ⏳ **`pyproject.toml` keywords + URLs audit** — confirm
+   `project.keywords` + `project.urls` (Repository, Documentation,
+   Issues, Changelog) for PyPI/Zenodo indexing.
+
+## v0.6 — Numerical rigor & coverage gates
+
+Earns reviewer trust beyond the existing FD spot-checks. ~3 weeks.
+
+1. ⏳ **Coverage gates in CI** — `pytest-cov` + Codecov upload from
+   `.github/workflows/ci.yml`; `cargo llvm-cov` on Linux for Rust
+   coverage; per-module floors via Codecov YAML (visible-but-non-
+   blocking initially). Codecov badge in README.
+2. ⏳ **Python-side property tests** — `hypothesis>=6.0` added to
+   `[project.optional-dependencies].dev`; new `tests/test_property_
+   {problem,hypergrad,criteria}.py` exercising random shapes / α /
+   conditioning. Mirrors the existing Rust proptest discipline.
+3. ⏳ **KKT post-solve assertions** — new `python/sparho/testing.py`
+   exposing `kkt_residual(problem, result)` as a Python wrapper over
+   `crates/sparho-core/src/residual.rs` (no new math); new
+   `tests/test_kkt_residual.py` parametrized across every
+   `Datafit × Penalty` combination — catches dispatch holes in the
+   closed unions.
+4. ⏳ **Golden numerical regression suite** — `tests/golden/` with JSON
+   fixtures pinning `(β*, loss, ||hypergrad||)` on ~10 canonical
+   triples at `atol=1e-10, rtol=1e-8`. Changes treated as conscious
+   numerical-behavior decisions reviewed in PR.
+
+## v0.7 — Reproducibility infrastructure
+
+Turns benchmarks from "works on my machine" into reviewer-reproducible.
+~3 weeks.
+
+1. ⏳ **BLAS-thread discipline** — new `docs/reproducibility.md`
+   covering `OMP_NUM_THREADS`/`MKL_NUM_THREADS`/`OPENBLAS_NUM_THREADS`/
+   `VECLIB_MAXIMUM_THREADS`; `sparho.testing.pin_blas_threads()`
+   context manager (small helper, not a feature) wired into benchmarks
+   and an opt-out test fixture.
+2. ⏳ **Dataset fixture caching** — `tests/fixtures/datasets.py` wraps
+   `libsvmdata.fetch_libsvm()` with SHA256 verification against a
+   pinned `libsvm_manifest.json`; refuses to run on hash drift.
+   Manifest-update protocol documented in `CONTRIBUTING.md`.
+3. ⏳ **Determinism audit matrix** — `tests/test_determinism_matrix.py`
+   extends the existing determinism test to `(seed) × (BLAS-threads ∈
+   {1, 2, 4}) × (criterion)`; output table embedded in
+   `docs/reproducibility.md`.
+4. ⏳ **Benchmark provenance** — `benchmarks/lasso_libsvm.py` emits a
+   `provenance.json` alongside results (CPU, BLAS via
+   `np.show_config()`, version pins, git SHA, thread counts); new
+   `benchmarks/render_tables.py` regenerates the Markdown tables in
+   `benchmarks/README.md` from result JSONs (replaces manual editing).
+5. ⏳ **`requirements-bench.txt`** — `uv pip compile` lockfile for the
+   bench extra, regenerated quarterly.
+
+## v0.8 — Theory in docs
+
+A researcher reading `docs/` should not need to fetch Pedregosa 2016 or
+the sparse-ho ICML 2020 paper. ~4 weeks; largest block, most reader-
+facing.
+
+1. ⏳ **`docs/theory/`** — new section with `index.md` (notation),
+   `implicit_diff.md` (IFT applied to the proximal-gradient fixed
+   point; derivation of `hypergrad.py:implicit_forward`'s linear
+   system), `active_set.md`, `penalties.md` (per-variant: prox formula,
+   Jacobian, subdifferential, pointing at `crates/sparho-core/src/
+   prox.rs`), `criteria.md` (incl. the SURE DOF derivation), and a
+   convergence sketch.
+2. ⏳ **`docs/refs.bib` + `sphinxcontrib-bibtex`** — single bibliography
+   for theory pages and docstrings. Reusable for any future paper.
+3. ⏳ **Docstring cross-links** — `implicit_forward`, `Sure`,
+   `CrossVal`, etc. gain a Sphinx `:doc:` reference to the theory
+   anchors; `docs/concepts.md` gets an intro paragraph pointing into
+   `theory/`.
+
+## v0.9 — Governance & community completion
+
+Closes the OSS-surface checklist reviewers verify mechanically. ~1 week.
+
+1. ⏳ **`GOVERNANCE.md`** — declares the maintainership model (single-
+   maintainer is fine to declare explicitly), decision process, how to
+   become a maintainer.
+2. ⏳ **Issue-template expansion** — `.github/ISSUE_TEMPLATE/
+   {question,documentation}.md` plus `config.yml` directing general
+   questions to a forum or email.
+3. ⏳ **`CONTRIBUTING.md` polish** — "How we accept contributions"
+   subsection linking `GOVERNANCE.md`; document the golden-regression
+   JSON update protocol (v0.6) and dataset-manifest update protocol
+   (v0.7).
+4. ⏳ **`SECURITY.md` audit** — confirm coverage of the Rust FFI
+   boundary (panic containment, unsafe-block audit policy).
+
+## v1.0-rc — Publication-ready scaffolding (no manuscript)
+
+Mechanical scaffolding only; manuscript prose is explicitly off the
+table. ~1 week.
+
+1. ⏳ **`paper/` directory** — `paper.md` with JOSS template (metadata
+   block populated, prose blank); `paper/figures/` with scripts that
+   regenerate every figure deterministically from `benchmarks/results/
+   *.json`; `paper/refs.bib` symlinked to `docs/refs.bib`; `Makefile`
+   targets `figures`, `build` (joss-via-docker), `clean`.
+2. ⏳ **`RELEASE.md` v1.0 protocol** — note that the v1.0 Zenodo DOI is
+   the citable artifact; any future paper cites *that* DOI.
+
+**Out of scope across v0.5–v1.0-rc (per user direction):** new
+algorithms / datafits / penalties / criteria / optimizers; manuscript
+prose; head-to-head benchmarks vs sparse-ho (it is not on PyPI and
+requires source install). The roadmap can be paused after any phase —
+each ships an independently releasable artifact.
+
 ## v0.1 work that already landed beyond plan scope
 
 - **Hypergradient-CG stability**

@@ -12,21 +12,36 @@ authors = [{ name = "David Villacis", email = "david@villacis.net" }]
 requires-python = ">=3.11"
 keywords = [
     "hyperparameter-optimization",
-    "bilevel",
+    "bilevel-optimization",
     "implicit-differentiation",
-    "sparse",
+    "sparse-regression",
     "lasso",
+    "elastic-net",
+    "group-lasso",
+    "sparse-logistic-regression",
+    "sure",
+    "hoag",
+    "scikit-learn",
+    "rust",
+    "pyo3",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Rust",
-    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
 ]
 dependencies = [
     "numpy>=1.24",
@@ -39,10 +54,16 @@ celer = ["celer>=0.7"]
 dev = [
     "pytest>=7",
     "pytest-cov",
+    "hypothesis>=6",
     "maturin>=1.5",
     "ruff",
     "mypy",
     "pre-commit",
+    # pandas is required by tests/test_wrappers.py (DataFrame round-trip
+    # coverage on the sklearn-compatible wrappers). It is also in the
+    # `bench` extra; declared here so `uv sync --extra dev` is a complete
+    # test environment.
+    "pandas>=2.1",
 ]
 docs = [
     "sphinx>=7.4",
@@ -62,10 +83,14 @@ bench = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/dvillacis/sparho"
 Repository = "https://github.com/dvillacis/sparho"
 Documentation = "https://sparho.readthedocs.io"
 Issues = "https://github.com/dvillacis/sparho/issues"
 Changelog = "https://github.com/dvillacis/sparho/blob/main/CHANGELOG.md"
+"Release Notes" = "https://github.com/dvillacis/sparho/releases"
+"Code of Conduct" = "https://github.com/dvillacis/sparho/blob/main/CODE_OF_CONDUCT.md"
+"Security Policy" = "https://github.com/dvillacis/sparho/blob/main/SECURITY.md"
 
 [tool.maturin]
 manifest-path = "crates/sparho-py/Cargo.toml"

@@ -1,0 +1,43 @@
+{
+  "name": "elastic_net_small",
+  "datafit": "SquaredLoss",
+  "penalty": "ElasticNet",
+  "solver": "SklearnElasticNet",
+  "solve_tol": 1e-10,
+  "n_samples": 60,
+  "n_features": 18,
+  "hyperparam": {
+    "kind": "scalar",
+    "value": 0.05
+  },
+  "active_set": [
+    1,
+    4,
+    9,
+    13
+  ],
+  "coef": [
+    0.0,
+    1.9245351807527733,
+    -0.0,
+    0.0,
+    -1.4095090046830123,
+    -0.0,
+    -0.0,
+    -0.0,
+    -0.0,
+    0.9302233495729054,
+    0.0,
+    -0.0,
+    0.0,
+    -2.44506697995572,
+    -0.0,
+    0.0,
+    -0.0,
+    -0.0
+  ],
+  "coef_l2": 3.540369940104851,
+  "coef_linf": 2.44506697995572,
+  "training_loss": 0.009586443908540293,
+  "kkt_residual": 2.0967672043070706e-12
+}

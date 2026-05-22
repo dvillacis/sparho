@@ -1,0 +1,79 @@
+# Codecov configuration for sparho.
+#
+# Coverage is *reported*, not enforced as a hard merge gate. The intent is
+# visibility: every PR shows a coverage delta in the GitHub status check,
+# but coverage regression alone does not fail CI. This avoids the
+# anti-pattern where reviewers waste cycles on coverage theater (writing
+# tests that hit lines without exercising behavior) just to make CI green.
+#
+# Floors are calibrated to "current observed minus a small slack" and
+# should be tightened as the codebase stabilizes. See ROADMAP.md v0.6.
+
+codecov:
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...95"
+  status:
+    project:
+      default:
+        # Project-wide floor: don't let total coverage drop below this.
+        target: 75%
+        threshold: 1%
+        informational: true
+      python:
+        flags: [python-3.12-ubuntu-latest]
+        target: 75%
+        threshold: 1%
+        informational: true
+      rust:
+        flags: [rust]
+        target: 70%
+        threshold: 2%
+        informational: true
+    patch:
+      default:
+        # Patch (new lines in this PR) target — informational only for
+        # now; flip to enforced once contributor cadence is established.
+        target: 80%
+        threshold: 5%
+        informational: true
+
+# Each CI matrix entry uploads with its own flag; the `flag_management`
+# block here documents what those flags mean and how they roll up.
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: python-3.12-ubuntu-latest
+      paths: [python/sparho/]
+      carryforward: true
+    - name: python-3.11-ubuntu-latest
+      paths: [python/sparho/]
+      carryforward: true
+    - name: python-3.13-ubuntu-latest
+      paths: [python/sparho/]
+      carryforward: true
+    - name: rust
+      paths: [crates/]
+      carryforward: true
+
+# Don't post a comment on PRs that don't change tracked paths.
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+ignore:
+  - "tests/"
+  - "benchmarks/"
+  - "docs/"
+  - "paper/"
+  - "**/*.pyi"
+  - "**/conftest.py"

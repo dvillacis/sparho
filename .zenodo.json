@@ -1,0 +1,52 @@
+{
+  "title": "sparho: nonsmooth bilevel hyperparameter optimization via implicit differentiation",
+  "description": "Python + Rust library for hyperparameter optimization of non-smooth sparse-regression estimators (Lasso, ElasticNet, weighted Lasso, group Lasso, sparse logistic regression) via implicit differentiation. Maintained, performant successor to sparse-ho (Bertrand et al., ICML 2020). Computes hypergradients by solving a restricted KKT linear system on the active set; outer loop via HOAG (Pedregosa, 2016) or gradient descent. Rust kernels via PyO3 + maturin ABI3, numpy/scipy-stack-native, no densification of sparse designs.",
+  "creators": [
+    {
+      "name": "Villacis, David",
+      "affiliation": "Independent",
+      "orcid": "0000-0000-0000-0000"
+    }
+  ],
+  "keywords": [
+    "hyperparameter optimization",
+    "bilevel optimization",
+    "implicit differentiation",
+    "sparse regression",
+    "lasso",
+    "elastic net",
+    "group lasso",
+    "sparse logistic regression",
+    "SURE",
+    "HOAG",
+    "scikit-learn",
+    "rust",
+    "PyO3"
+  ],
+  "license": "BSD-3-Clause",
+  "upload_type": "software",
+  "access_right": "open",
+  "language": "eng",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/dvillacis/sparho",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://sparho.readthedocs.io",
+      "relation": "isDocumentedBy",
+      "resource_type": "publication-softwaredocumentation"
+    },
+    {
+      "identifier": "https://github.com/QB3/sparse-ho",
+      "relation": "isDerivedFrom",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "10.48550/arXiv.2002.08943",
+      "relation": "isDerivedFrom",
+      "resource_type": "publication-conferencepaper"
+    }
+  ]
+}

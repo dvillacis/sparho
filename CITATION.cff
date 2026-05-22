@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://citation-file-format.github.io/1.2.0/schema.json
+cff-version: 1.2.0
+title: "sparho: nonsmooth bilevel hyperparameter optimization via implicit differentiation"
+message: "If you use sparho in academic work, please cite it using the metadata in this file."
+type: software
+authors:
+  - given-names: David
+    family-names: Villacis
+    email: david@villacis.net
+    # Replace with the author's ORCID iD before the first tagged release that
+    # mints a Zenodo DOI. See RELEASE.md § Zenodo DOI integration.
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/dvillacis/sparho"
+url: "https://sparho.readthedocs.io"
+abstract: >-
+  sparho is a Python + Rust library for hyperparameter optimization of
+  non-smooth sparse-regression estimators (Lasso, ElasticNet, weighted Lasso,
+  group Lasso, sparse logistic regression) via implicit differentiation. It is
+  a maintained, performant successor to sparse-ho (Bertrand et al., ICML 2020,
+  dormant since 2022). The hypergradient is computed by solving a restricted
+  KKT linear system on the active set; outer-loop optimization uses HOAG
+  (Pedregosa, 2016) or plain gradient descent. Rust kernels (PyO3 + ABI3,
+  numpy/scipy-stack-native) handle prox operators, CSC matvecs, and the
+  restricted Hessian-vector product without densifying sparse designs.
+keywords:
+  - hyperparameter-optimization
+  - bilevel-optimization
+  - implicit-differentiation
+  - sparse-regression
+  - lasso
+  - elastic-net
+  - group-lasso
+  - sparse-logistic-regression
+  - sure
+  - hoag
+  - scikit-learn
+  - rust
+  - pyo3
+license: BSD-3-Clause
+# When the v0.5.0 tag mints the first Zenodo DOI, add:
+# identifiers:
+#   - description: "Zenodo concept DOI (all versions)"
+#     type: doi
+#     value: "10.5281/zenodo.XXXXXXX"
+# See RELEASE.md § Zenodo DOI integration for the full procedure.

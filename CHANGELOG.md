@@ -5,6 +5,61 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+### Citability (v0.5)
+- **Citation infrastructure.** New `CITATION.cff` (schema 1.2.0, passes
+  `cffconvert --validate`) and `.zenodo.json` so a tagged release auto-
+  mints a Zenodo DOI via the GitHub–Zenodo integration; new
+  `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1 by reference);
+  `README.md` gains "How to cite" + BibTeX entries for sparho and the
+  underlying `sparse-ho` ICML 2020 paper, plus a "Community" link block.
+  `RELEASE.md` documents the one-time GitHub–Zenodo setup and the
+  per-tag DOI-minting procedure; `pyproject.toml` keywords expand 5→13
+  and `project.urls` 4→8 (Homepage, Release Notes, Code of Conduct,
+  Security Policy). New `citation` CI job runs `cffconvert --validate`
+  on every PR. ORCID and concept-DOI placeholders are filled in once at
+  the first v0.5.0 tag.
+
+### Numerical rigor (v0.6)
+- **Coverage gates.** `pytest --cov=sparho` wired into every CI
+  matrix entry with Codecov upload (one flag per matrix cell);
+  separate `rust-coverage` job runs `cargo llvm-cov --lib` on Linux
+  and uploads under the `rust` flag. New `codecov.yml` declares
+  per-module floors in informational mode (75% python / 70% rust);
+  Codecov badge added to `README.md`.
+- **KKT post-solve assertions.** New public testing surface
+  `sparho.testing.kkt_residual` / `assert_kkt_optimal`, computing the
+  proximal fixed-point residual `‖β − prox_R(β − ∇L(β); α)‖_∞` by
+  composing the existing Rust prox kernels (`_core.prox_{l1,
+  elastic_net,weighted_l1,group_l1}`) with CSC matvecs — no new
+  numerical kernels. Exhaustive `match` on the closed `Datafit ×
+  Penalty` union with `assert_never` tail so mypy flags missed
+  dispatch when a new variant lands. `tests/test_kkt_residual.py`
+  parametrizes across every (Datafit, Penalty) combination including
+  `L1`/`ElasticNet`/`WeightedL1`/`GroupL1` × `SquaredLoss`/`LogisticLoss`
+  (5 solver-level assertions plus boundary cases at α > α_max and
+  off-optimum perturbations).
+- **Hypothesis property tests on the Python surface.** Three new test
+  files (`test_property_problem.py`, `test_property_hypergrad.py`,
+  `test_property_criteria.py`) using `hypothesis>=6.0`. Cover Problem
+  construction invariants under random shape/sparsity, FD parity of
+  `implicit_forward` over random Lasso problems (log-uniform α
+  exercising both nearly-fully-active and nearly-fully-sparse
+  regimes), and `HeldOutMSE` parity against a direct numpy
+  implementation. Modest `max_examples` (15–40) keeps CI fast.
+- **Golden numerical regression suite.** New `tests/golden/` with five
+  JSON fixtures pinning `(β*, training_loss, KKT residual, active
+  set)` at `tol=1e-10` for canonical (datafit, penalty, solver, α)
+  triples — Lasso, ElasticNet, weighted Lasso, group Lasso, sparse
+  logistic regression. `tests/golden/generate.py` regenerates the
+  fixtures; the runner in `tests/test_golden.py` re-solves and
+  asserts agreement at `atol=1e-8, rtol=1e-6` on coef, `atol=1e-10,
+  rtol=1e-8` on training loss, and active-set bit-equality.
+- **Test environment completeness.** `hypothesis>=6` and `pandas>=2.1`
+  added to the `[project.optional-dependencies].dev` extra. The
+  pandas pin fixes a pre-existing collection error in
+  `tests/test_wrappers.py` (DataFrame round-trip coverage) that the
+  full-suite gate from B.1 surfaced. Total test count 197 → 229.
+
 ### Security
 - **FFI hardening (v0.3.1).** Every Rust kernel that previously did a bare
   `as usize` cast on caller-supplied `i32` indices now validates the input

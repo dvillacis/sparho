@@ -1,5 +1,11 @@
 # sparho
 
+[![CI](https://github.com/dvillacis/sparho/actions/workflows/ci.yml/badge.svg)](https://github.com/dvillacis/sparho/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/dvillacis/sparho/branch/main/graph/badge.svg)](https://codecov.io/gh/dvillacis/sparho)
+[![PyPI](https://img.shields.io/pypi/v/sparho.svg)](https://pypi.org/project/sparho/)
+[![Python](https://img.shields.io/pypi/pyversions/sparho.svg)](https://pypi.org/project/sparho/)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
+
 Nonsmooth bilevel hyperparameter optimization via implicit differentiation.
 
 A maintained, performant successor to [`sparse-ho`](https://github.com/QB3/sparse-ho)
@@ -109,6 +115,52 @@ unsupervised tuning, a `MultiTaskLasso` / Group-L1 penalty, and adapters
 for `skein` (nonconvex weighted/group) and `skglm` (MCP / SCAD / SLOPE /
 Group / Huber / Poisson). See `docs/feature_research.md` for the
 2026-05-20 landscape synthesis behind these picks.
+
+## How to cite
+
+If you use `sparho` in academic work, please cite it. The repository ships a
+[`CITATION.cff`](CITATION.cff) — GitHub renders a "Cite this repository" widget
+in the right-hand sidebar that produces BibTeX, APA, and other formats from it.
+
+Each tagged release also mints a [Zenodo](https://zenodo.org/) DOI via the
+GitHub–Zenodo integration. Cite the *concept* DOI (resolves to all versions)
+when you want to refer to the project as a whole, or a *version* DOI for
+reproducibility. The DOI badge below is a placeholder until the first tagged
+release (`v0.5.0`):
+
+<!-- Replace `XXXXXXX` with the concept DOI after the first Zenodo release.
+     See RELEASE.md § Zenodo DOI integration for the procedure. -->
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+
+```bibtex
+@software{sparho,
+  author  = {Villacis, David},
+  title   = {sparho: nonsmooth bilevel hyperparameter optimization via implicit differentiation},
+  url     = {https://github.com/dvillacis/sparho},
+  doi     = {10.5281/zenodo.XXXXXXX},
+  version = {0.5.0},
+  year    = {2026}
+}
+```
+
+The original `sparse-ho` algorithm should be cited alongside `sparho`:
+
+```bibtex
+@inproceedings{bertrand2020implicit,
+  author    = {Bertrand, Quentin and Klopfenstein, Quentin and Blondel, Mathurin
+               and Vaiter, Samuel and Gramfort, Alexandre and Salmon, Joseph},
+  title     = {Implicit Differentiation of Lasso-Type Models for Hyperparameter Optimization},
+  booktitle = {Proceedings of the 37th International Conference on Machine Learning (ICML)},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2002.08943}
+}
+```
+
+## Community
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, gates, contribution flow.
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
+- [`SECURITY.md`](SECURITY.md) — vulnerability disclosure policy.
 
 ## License
 
