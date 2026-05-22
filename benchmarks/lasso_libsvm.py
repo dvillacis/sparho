@@ -38,8 +38,15 @@ from __future__ import annotations
 
 import argparse
 import gc
+import io
+import json
+import os
+import platform
+import subprocess
 import sys
 import time
+from contextlib import redirect_stdout
+from pathlib import Path
 
 import numpy as np
 import scipy.sparse as sp
@@ -232,6 +239,29 @@ def main() -> int:
         default=0.0,
         help="seconds to sleep between iters to let thermal state settle (default: 0)",
     )
+    parser.add_argument(
+        "--blas-threads",
+        type=int,
+        default=1,
+        help=(
+            "pin BLAS threadpools (OMP/MKL/OpenBLAS/VECLIB/NUMEXPR/BLIS) "
+            "to this many threads for the duration of the run (default: 1). "
+            "Single-threaded BLAS is required for the < 10%% reproducibility "
+            "target — see docs/reproducibility.md."
+        ),
+    )
+    parser.add_argument(
+        "--results-json",
+        type=Path,
+        default=None,
+        help="write per-dataset machine-readable results to this path",
+    )
+    parser.add_argument(
+        "--provenance-json",
+        type=Path,
+        default=None,
+        help="write run-environment provenance (CPU, BLAS, versions, git SHA) here",
+    )
     args = parser.parse_args()
     warm_start = not args.cold_start
 
@@ -255,9 +285,152 @@ def main() -> int:
     )
     print(
         f"sparho mode: {mode}  inner-solver: {args.solver}  {repeat_str}  "
+        f"BLAS threads: {args.blas_threads}  "
         f"(hoag_search + exponential inner-tol decrease)"
     )
+
+    # Pin BLAS for the entire measured loop. Without this, multi-threaded
+    # reductions introduce ~5%+ run-to-run jitter that swamps the < 10%
+    # speedup-ratio target. Provenance and JSON emission both happen inside
+    # the block so the captured env-var state reflects the measured state,
+    # not the post-restore state.
+    from sparho.testing import pin_blas_threads
+
+    with pin_blas_threads(args.blas_threads):
+        table_rows, results = _run_benchmarks(args, datasets, n_iter, warm_start, warmup)
+        provenance = _provenance_blob(args)
+
+        print("\n## Results\n")
+        print(
+            "| dataset | shape "
+            "| sparho α* | sparho MSE | sparho time | sparho iters "
+            "| LassoCV α* | LassoCV MSE | LassoCV time | LassoCV grid "
+            "| speedup |"
+        )
+        print("|---|---|---|---|---|---|---|---|---|---|---|")
+        for row in table_rows:
+            print(row)
+
+        if args.results_json is not None:
+            args.results_json.parent.mkdir(parents=True, exist_ok=True)
+            args.results_json.write_text(
+                json.dumps(
+                    {"datasets": results, "config": _config_blob(args)}, indent=2
+                )
+                + "\n"
+            )
+            print(f"\nwrote results -> {args.results_json}")
+        if args.provenance_json is not None:
+            args.provenance_json.parent.mkdir(parents=True, exist_ok=True)
+            args.provenance_json.write_text(json.dumps(provenance, indent=2) + "\n")
+            print(f"wrote provenance -> {args.provenance_json}")
+
+    return 0
+
+
+def _config_blob(args: argparse.Namespace) -> dict:
+    """Pure CLI-config snapshot for the results JSON."""
+    return {
+        "solver": args.solver,
+        "warm_start": not args.cold_start,
+        "quick": args.quick,
+        "repeat": args.repeat,
+        "warmup": args.warmup if args.warmup is not None else (1 if args.repeat > 1 else 0),
+        "cooldown_seconds": args.cooldown,
+        "blas_threads": args.blas_threads,
+        "datasets": args.datasets,
+    }
+
+
+def _git_sha() -> str | None:
+    try:
+        sha = subprocess.check_output(  # noqa: S603 (sanitised: literal argv)
+            ["git", "rev-parse", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return sha or None
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+
+
+def _blas_resolved() -> dict:
+    """Capture ``np.show_config()`` as a structured-ish string."""
+    buf = io.StringIO()
+    try:
+        with redirect_stdout(buf):
+            np.show_config()
+    except Exception as e:  # pragma: no cover — defensive
+        return {"error": f"np.show_config() failed: {e}"}
+    return {"raw": buf.getvalue()}
+
+
+def _package_version(name: str) -> str | None:
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            return version(name)
+        except PackageNotFoundError:
+            return None
+    except ImportError:
+        return None
+
+
+def _provenance_blob(args: argparse.Namespace) -> dict:
+    """Run-environment snapshot — sufficient to reproduce the wall numbers."""
+    return {
+        "schema": "sparho-bench-provenance@1",
+        "captured_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "git_sha": _git_sha(),
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "python_implementation": platform.python_implementation(),
+            "python_version": platform.python_version(),
+        },
+        "blas": _blas_resolved(),
+        "blas_threads_requested": args.blas_threads,
+        "blas_env_vars_at_capture": {
+            var: os.environ.get(var)
+            for var in (
+                "OMP_NUM_THREADS",
+                "MKL_NUM_THREADS",
+                "OPENBLAS_NUM_THREADS",
+                "VECLIB_MAXIMUM_THREADS",
+                "NUMEXPR_NUM_THREADS",
+                "BLIS_NUM_THREADS",
+            )
+        },
+        "package_versions": {
+            name: _package_version(name)
+            for name in (
+                "sparho",
+                "numpy",
+                "scipy",
+                "scikit-learn",
+                "celer",
+                "libsvmdata",
+                "pandas",
+                "matplotlib",
+            )
+        },
+        "config": _config_blob(args),
+    }
+
+
+def _run_benchmarks(
+    args: argparse.Namespace,
+    datasets: list[str],
+    n_iter: int,
+    warm_start: bool,
+    warmup: int,
+) -> tuple[list[str], list[dict]]:
+    """Inner benchmark loop. Returns the markdown rows and the structured results."""
     table_rows: list[str] = []
+    results: list[dict] = []
     for ds in datasets:
         meta = DATASETS.get(ds)
         if meta is None:
@@ -319,19 +492,32 @@ def main() -> int:
         )
         print(f"  speedup:  {lcv['elapsed'] / s['elapsed']:.2f}×{spread_tag}")
         table_rows.append(_print_row(ds, X.shape, s, lcv))
+        results.append(
+            {
+                "dataset": ds,
+                "shape": list(X.shape),
+                "sparse": bool(sp.issparse(X)),
+                "sparho": {
+                    "alpha_star": float(s["alpha"]),
+                    "mse": float(s["mse"]),
+                    "iters": int(s["iters"]),
+                    "elapsed_seconds": float(s["elapsed"]),
+                    "elapsed_spread": float(s["elapsed_spread"]),
+                    "n_samples": int(s["n_samples"]),
+                },
+                "lasso_cv": {
+                    "alpha_star": float(lcv["alpha"]),
+                    "mse": float(lcv["mse"]),
+                    "grid_size": int(lcv["iters"]),
+                    "elapsed_seconds": float(lcv["elapsed"]),
+                    "elapsed_spread": float(lcv["elapsed_spread"]),
+                    "n_samples": int(lcv["n_samples"]),
+                },
+                "speedup": float(lcv["elapsed"] / s["elapsed"]),
+            }
+        )
 
-    print("\n## Results\n")
-    print(
-        "| dataset | shape "
-        "| sparho α* | sparho MSE | sparho time | sparho iters "
-        "| LassoCV α* | LassoCV MSE | LassoCV time | LassoCV grid "
-        "| speedup |"
-    )
-    print("|---|---|---|---|---|---|---|---|---|---|---|")
-    for row in table_rows:
-        print(row)
-
-    return 0
+    return table_rows, results
 
 
 if __name__ == "__main__":

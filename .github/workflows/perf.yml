@@ -63,7 +63,21 @@ jobs:
             --warmup 1 \
             --cooldown 2 \
             --quick \
+            --blas-threads 1 \
+            --results-json perf-results.json \
+            --provenance-json perf-provenance.json \
             | tee perf.log
+      - name: render perf tables from JSON
+        # Regenerates the Markdown tables from the structured results.
+        # Output goes alongside the raw JSON as an artifact — reviewers can
+        # diff against the in-tree README without re-running the bench.
+        run: |
+          python benchmarks/render_tables.py \
+            --results perf-results.json \
+            --provenance perf-provenance.json \
+            --out perf-tables.md
+          echo "--- rendered tables ---"
+          cat perf-tables.md
       - name: enforce < 10 % sparho-side wall spread
         run: |
           python - <<'PY'
@@ -87,7 +101,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: perf-log
-          path: perf.log
+          name: perf-artifacts
+          path: |
+            perf.log
+            perf-results.json
+            perf-provenance.json
+            perf-tables.md
           if-no-files-found: warn
           retention-days: 30

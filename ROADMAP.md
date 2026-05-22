@@ -373,26 +373,43 @@ Earns reviewer trust beyond the existing FD spot-checks. ~3 weeks.
 Turns benchmarks from "works on my machine" into reviewer-reproducible.
 ~3 weeks.
 
-1. ⏳ **BLAS-thread discipline** — new `docs/reproducibility.md`
-   covering `OMP_NUM_THREADS`/`MKL_NUM_THREADS`/`OPENBLAS_NUM_THREADS`/
-   `VECLIB_MAXIMUM_THREADS`; `sparho.testing.pin_blas_threads()`
-   context manager (small helper, not a feature) wired into benchmarks
-   and an opt-out test fixture.
-2. ⏳ **Dataset fixture caching** — `tests/fixtures/datasets.py` wraps
-   `libsvmdata.fetch_libsvm()` with SHA256 verification against a
-   pinned `libsvm_manifest.json`; refuses to run on hash drift.
-   Manifest-update protocol documented in `CONTRIBUTING.md`.
-3. ⏳ **Determinism audit matrix** — `tests/test_determinism_matrix.py`
-   extends the existing determinism test to `(seed) × (BLAS-threads ∈
-   {1, 2, 4}) × (criterion)`; output table embedded in
+1. ✅ **BLAS-thread discipline** — landed. New `docs/reproducibility.md`
+   covers the OMP/MKL/OpenBLAS/Accelerate/NumExpr/BLIS env vars + their
+   non-determinism semantics. `sparho.testing.pin_blas_threads(n)`
+   context manager sets all six env vars *and* retunes the live
+   `threadpoolctl` pool; restores on exit. Autouse `tests/conftest.py`
+   fixture pins the test session to 1 thread (opt-out via
+   `SPARHO_TEST_RESPECT_BLAS=1`); `benchmarks/lasso_libsvm.py` accepts
+   `--blas-threads` and wraps the main loop in the context manager.
+2. ✅ **Dataset hash verification** — landed. New
+   `tests/fixtures/datasets.py` exposes `fetch_verified(name)` which
+   wraps `libsvmdata.fetch_libsvm` with SHA256 verification against a
+   pinned `tests/fixtures/libsvm_manifest.json`. Missing entries
+   bootstrap-print the observed hashes; drift raises
+   `DatasetHashMismatch`. `breast-cancer` bootstrap-pinned at this
+   release. Workflow documented in `CONTRIBUTING.md` (also covers the
+   golden-fixture regeneration protocol).
+3. ✅ **Determinism audit matrix** — landed.
+   `tests/test_determinism_matrix.py` runs `(BLAS threads ∈ {1, 2, 4})
+   × (seed ∈ {0, 7}) × (criterion ∈ {CrossVal, Sure})` — 12 matrix
+   cases plus a sanity test. At `n_threads=1` it asserts bit-equality;
+   at `n_threads > 1` it asserts agreement within `atol=1e-5,
+   rtol=1e-4` (the test serves as both regression guard and
+   calibration of the drift envelope).
+4. ✅ **Benchmark provenance + table renderer** — landed.
+   `benchmarks/lasso_libsvm.py` emits a versioned `provenance.json`
+   (git SHA, CPU, OS, Python/numpy/scipy/sklearn/celer versions, BLAS
+   backend via `np.show_config()`, all six BLAS env vars at capture
+   time, thread-count) and a structured `results.json`. New
+   `benchmarks/render_tables.py` deterministically converts JSON to
+   the canonical Markdown tables; wired into `perf.yml` which now
+   uploads `perf-results.json`, `perf-provenance.json`,
+   `perf-tables.md`, and `perf.log` as a single `perf-artifacts`
+   bundle.
+5. ✅ **`requirements-bench.txt`** — generated via `uv pip compile
+   pyproject.toml --extra bench`. Pins the exact dependency closure
+   used for the published numbers. Quarterly regen cadence in
    `docs/reproducibility.md`.
-4. ⏳ **Benchmark provenance** — `benchmarks/lasso_libsvm.py` emits a
-   `provenance.json` alongside results (CPU, BLAS via
-   `np.show_config()`, version pins, git SHA, thread counts); new
-   `benchmarks/render_tables.py` regenerates the Markdown tables in
-   `benchmarks/README.md` from result JSONs (replaces manual editing).
-5. ⏳ **`requirements-bench.txt`** — `uv pip compile` lockfile for the
-   bench extra, regenerated quarterly.
 
 ## v0.8 — Theory in docs
 

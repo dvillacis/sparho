@@ -87,6 +87,52 @@ release.
 - We don't squash on merge — write commits like they'll be read in
   `git log`.
 
+## Updating the libsvm dataset manifest
+
+`tests/fixtures/datasets.py` verifies fetched libsvm datasets against
+SHA256 hashes pinned in `tests/fixtures/libsvm_manifest.json`. Drift in
+those bytes raises `DatasetHashMismatch` rather than silently consuming
+different data.
+
+To **add a new dataset** to the manifest:
+
+```bash
+uv run python -c \
+  'from tests.fixtures.datasets import regenerate_manifest_entry; \
+   import json; print(json.dumps(regenerate_manifest_entry("<name>"), indent=2))'
+```
+
+Paste the printed entry into `libsvm_manifest.json` under its dataset
+key. Commit alongside whatever consumer change motivated the addition.
+
+To **update an existing dataset** (legitimate upstream rehost):
+
+1. Run the regenerate command above and capture the new hashes.
+2. Verify the change is real (libsvm's GitHub issue tracker, upstream
+   changelog, or by re-downloading on a second machine and confirming
+   the new hashes match).
+3. Update the manifest entry and document the rationale in the commit
+   message — "libsvmdata v0.6 switched from CC-BY hosting to Zenodo"
+   etc.
+
+Never update a hash to make a failing test pass without step 2 —
+silent byte drift is the failure mode this guard exists to catch.
+
+## Updating the golden numerical fixtures
+
+`tests/golden/*.json` pins `(β*, training_loss, KKT residual, active
+set)` for canonical inner-solver runs (see `tests/golden/generate.py`).
+If an intentional algorithmic change shifts these numbers, regenerate
+the JSONs and commit them as a discrete numerical-behaviour change:
+
+```bash
+uv run python tests/golden/generate.py
+```
+
+Same discipline as the dataset manifest: never regenerate to make a
+failing test pass without confirming the change is intentional and
+correct.
+
 ## Security
 
 See `SECURITY.md` for the vulnerability disclosure path.

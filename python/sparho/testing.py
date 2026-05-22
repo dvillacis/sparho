@@ -26,6 +26,9 @@ flags any new variant the moment one is added.
 
 from __future__ import annotations
 
+import contextlib
+import os
+from collections.abc import Iterator
 from typing import Any, assert_never
 
 import numpy as np
@@ -45,7 +48,7 @@ from .problem import (
     WeightedL1,
 )
 
-__all__ = ["kkt_residual", "assert_kkt_optimal"]
+__all__ = ["assert_kkt_optimal", "kkt_residual", "pin_blas_threads"]
 
 _F64 = NDArray[np.float64]
 _I32 = NDArray[np.int32]
@@ -190,3 +193,76 @@ def assert_kkt_optimal(
             f"(datafit={type(problem.datafit).__name__}, "
             f"penalty={type(problem.penalty).__name__})"
         )
+
+
+# ---------------------------------------------------------------- BLAS pinning
+
+
+_BLAS_ENV_VARS: tuple[str, ...] = (
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "BLIS_NUM_THREADS",
+)
+
+
+@contextlib.contextmanager
+def pin_blas_threads(n: int = 1) -> Iterator[dict[str, str | None]]:
+    """Pin every BLAS-related thread count to ``n`` for the with-block.
+
+    Sets ``OMP_NUM_THREADS``, ``MKL_NUM_THREADS``, ``OPENBLAS_NUM_THREADS``,
+    ``VECLIB_MAXIMUM_THREADS``, ``NUMEXPR_NUM_THREADS``, and
+    ``BLIS_NUM_THREADS`` to ``str(n)``, and additionally retunes any live
+    threadpool managed by ``threadpoolctl`` (which sklearn ships
+    transitively). Both halves matter: env vars affect any subprocess
+    spawned inside the block (e.g. joblib workers); the threadpool retuning
+    affects BLAS calls in the current process.
+
+    Restores the prior environment + threadpool state on exit. Yields the
+    mapping of original env-var values so callers can inspect what was
+    overridden.
+
+    Parameters
+    ----------
+    n
+        Number of threads. ``1`` is the canonical setting for benchmarks
+        and determinism tests — multi-threaded BLAS introduces nondeterminism
+        in reduction ordering even at the same seed.
+
+    Notes
+    -----
+    Numpy reads ``OMP_NUM_THREADS`` etc. at *first* BLAS call, not on every
+    call. If the process has already issued a BLAS operation before this
+    context manager runs, the env-var changes will not retune the live
+    pool — only ``threadpoolctl`` can. This helper does both, so the
+    typical "set early, retune late" foot-gun is handled. For absolute
+    determinism, set the env vars before the Python process starts (the
+    benchmarks documented in ``docs/reproducibility.md`` follow that
+    pattern).
+    """
+    if n < 1:
+        raise ValueError(f"pin_blas_threads: n must be >= 1, got {n}")
+    saved_env: dict[str, str | None] = {var: os.environ.get(var) for var in _BLAS_ENV_VARS}
+    for var in _BLAS_ENV_VARS:
+        os.environ[var] = str(n)
+    # threadpoolctl is optional — sparho doesn't declare it directly, but it
+    # ships transitively with scikit-learn. If it's missing, fall back to
+    # env-var-only mode (still useful for subprocess control).
+    threadpool_ctx: contextlib.AbstractContextManager[Any] = contextlib.nullcontext()
+    try:
+        from threadpoolctl import threadpool_limits
+
+        threadpool_ctx = threadpool_limits(limits=n)
+    except ImportError:
+        pass
+    try:
+        with threadpool_ctx:
+            yield saved_env
+    finally:
+        for var, prior in saved_env.items():
+            if prior is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prior

@@ -1,0 +1,17 @@
+{
+  "_doc": [
+    "Pinned SHA256 hashes for libsvm datasets fetched by the bench + tests.",
+    "Bootstrap a new entry by running:",
+    "  uv run python -c 'from tests.fixtures.datasets import regenerate_manifest_entry; import json; print(json.dumps(regenerate_manifest_entry(\"<name>\"), indent=2))'",
+    "then paste the entry under its dataset key here. Drift in any hash",
+    "(including a shape change) causes DatasetHashMismatch in `fetch_verified`.",
+    "See CONTRIBUTING.md ('Updating the libsvm dataset manifest') for the",
+    "full workflow including how to handle a legitimate upstream rehost."
+  ],
+  "breast-cancer": {
+    "shape": [683, 10],
+    "sparse": false,
+    "y_sha256": "b50430d5cada4041bd59cb51a8199aced1c01f55e712662c3db29ce75b264f18",
+    "X_sha256": "6f0e80d040744436d4b1c7ca07c3e396b719fb97ec955c7b96be3e7aa7bf9496"
+  }
+}

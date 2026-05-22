@@ -150,5 +150,5 @@ strict = true
 files = ["python/sparho"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "scipy.*", "celer.*", "libsvmdata.*"]
+module = ["sklearn.*", "scipy.*", "celer.*", "libsvmdata.*", "threadpoolctl.*"]
 ignore_missing_imports = true
