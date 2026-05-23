@@ -414,22 +414,30 @@ Turns benchmarks from "works on my machine" into reviewer-reproducible.
 ## v0.8 — Theory in docs
 
 A researcher reading `docs/` should not need to fetch Pedregosa 2016 or
-the sparse-ho ICML 2020 paper. ~4 weeks; largest block, most reader-
-facing.
+the sparse-ho ICML 2020 paper.
 
-1. ⏳ **`docs/theory/`** — new section with `index.md` (notation),
-   `implicit_diff.md` (IFT applied to the proximal-gradient fixed
-   point; derivation of `hypergrad.py:implicit_forward`'s linear
-   system), `active_set.md`, `penalties.md` (per-variant: prox formula,
-   Jacobian, subdifferential, pointing at `crates/sparho-core/src/
-   prox.rs`), `criteria.md` (incl. the SURE DOF derivation), and a
-   convergence sketch.
-2. ⏳ **`docs/refs.bib` + `sphinxcontrib-bibtex`** — single bibliography
-   for theory pages and docstrings. Reusable for any future paper.
-3. ⏳ **Docstring cross-links** — `implicit_forward`, `Sure`,
-   `CrossVal`, etc. gain a Sphinx `:doc:` reference to the theory
-   anchors; `docs/concepts.md` gets an intro paragraph pointing into
-   `theory/`.
+1. ✅ **`docs/theory/`** — new section landed.
+   `theory/index.md` (notation + bilevel setup),
+   `theory/implicit_diff.md` (KKT derivation of `M_AA · dβ*/dα = -r`,
+   prox fixed-point equivalence, SPD argument, ridge bias bound),
+   `theory/active_set.md` (strict-subgradient locally-constant-A
+   argument plus the GroupL1 active-group expansion), `theory/penalties.md`
+   (per-variant prox / Jacobian / subdifferential / α-Jacobian, with
+   pointers to `crates/sparho-core/src/prox.rs`), `theory/criteria.md`
+   (chain rule for HeldOutMSE / HeldOutLogistic / CrossVal plus a full
+   SURE/SUGAR FDMC derivation), and `theory/convergence.md` (HOAG
+   sketch + sparho-specific deviations).
+2. ✅ **`docs/refs.bib` + `sphinxcontrib-bibtex`** — single bibliography
+   seeded with the load-bearing references (Pedregosa 2016, Bertrand
+   2020/2022, Deledalle 2014, Stein 1981, Zou-Hastie-Tibshirani 2007,
+   Yuan-Lin 2006, Beck-Teboulle 2009, Krantz-Parks 2013, Bolte 2021,
+   Massias 2018, supporting refs). `docs/theory/references.md` renders
+   the full listing. MyST `dollarmath` + `amsmath` extensions enabled
+   for inline / display math. Reusable for any future paper.
+3. ✅ **Docstring cross-links** — `implicit_forward`, `Sure`, `CrossVal`,
+   and `hoag_search` gained Sphinx `:doc:` cross-references into the
+   new theory pages; `docs/concepts.md` opens with an intro paragraph
+   pointing into `theory/`; `docs/index.md` exposes a Theory toctree.
 
 ## v0.9 — Governance & community completion
 

@@ -5,6 +5,33 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+### Theory in docs (v0.8)
+- **`docs/theory/` section.** New self-contained derivations covering
+  the bilevel setup and notation (`theory/index.md`), the KKT-restricted
+  implicit-diff linear system `M_AA · dβ*/dα = -r` and its ridge
+  stabilization (`theory/implicit_diff.md`), the active-set restriction
+  argument under strict subgradient inequality and GroupL1's
+  active-group expansion (`theory/active_set.md`), per-penalty prox /
+  Jacobian / subdifferential / α-Jacobian tables linked into
+  `crates/sparho-core/src/prox.rs` (`theory/penalties.md`), the
+  outer-criterion chain rule plus a full SURE / SUGAR FDMC derivation
+  from Stein's identity (`theory/criteria.md`), and the HOAG
+  convergence sketch with sparho-specific deviations (`theory/convergence.md`).
+- **`docs/refs.bib` + `sphinxcontrib-bibtex`.** Single bibliography
+  backing theory pages and docstrings. Seeded with the foundational
+  papers (Pedregosa 2016 HOAG, Bertrand 2020/2022 implicit-diff,
+  Deledalle 2014 SUGAR, Stein 1981, Zou-Hastie-Tibshirani 2007
+  Lasso-DOF, Yuan-Lin 2006 Group Lasso, Beck-Teboulle 2009 FISTA,
+  Krantz-Parks 2013 IFT, Bolte 2021 nonsmooth IFT, Massias 2018 celer,
+  and supporting references). New `docs/theory/references.md` renders
+  the full bibliography. MyST `dollarmath` + `amsmath` extensions
+  enabled in `docs/conf.py` for inline / display math.
+- **Docstring cross-links.** `implicit_forward`, `Sure`, `CrossVal`,
+  and `hoag_search` docstrings gained Sphinx `:doc:` references into
+  the new theory pages; `docs/concepts.md` opens with an intro
+  paragraph pointing into `theory/`; main `docs/index.md` exposes a
+  new "Theory" toctree.
+
 ### Reproducibility (v0.7)
 - **BLAS-thread discipline.** New `sparho.testing.pin_blas_threads(n)`
   context manager pins `OMP_NUM_THREADS`, `MKL_NUM_THREADS`,

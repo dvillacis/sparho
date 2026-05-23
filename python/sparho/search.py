@@ -268,6 +268,15 @@ def hoag_search(
     Returns
     -------
     SearchResult
+
+    Notes
+    -----
+    The slack-augmented acceptance test, the Lipschitz-proxy ``L`` updates,
+    the tolerance-schedule trade-off, and a sketch of why the algorithm
+    converges to a stationary point of the (noisy) outer objective are
+    laid out in :doc:`/theory/convergence`. The two-steps-per-iter heuristic
+    on acceptance and the ``max_step`` cap are sparho-specific extensions
+    documented there.
     """
     if tolerance_decrease not in ("constant", "exponential"):
         raise ValueError(

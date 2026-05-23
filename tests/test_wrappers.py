@@ -16,7 +16,6 @@ Coverage:
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import pytest
 import scipy.sparse as sp
 from sklearn.base import clone
@@ -171,6 +170,7 @@ def test_elastic_net_ho_rho_out_of_range_raises(reg_data):
 
 
 def test_lasso_ho_dataframe_round_trip(reg_data):
+    pd = pytest.importorskip("pandas")
     X, y = reg_data
     cols = [f"f{i}" for i in range(X.shape[1])]
     df = pd.DataFrame(X, columns=cols)

@@ -158,6 +158,21 @@ def implicit_forward(
     hypergradient
         Scalar for ``L1`` / ``ElasticNet``; ``(n_features,)`` array for
         ``WeightedL1`` (entries outside the active set are exactly zero).
+
+    See Also
+    --------
+    sparho.criteria.CrossVal, sparho.criteria.Sure
+        Criteria whose ``value_and_hypergrad`` chains ``∂C/∂β`` through
+        this function.
+
+    Notes
+    -----
+    Full derivation of the linear system ``M_AA · dβ*/dα = -r``, the
+    active-set restriction argument, the per-penalty curvature terms,
+    and the ridge-stabilization bias bound live under :doc:`/theory/index`:
+    :doc:`/theory/implicit_diff` (KKT view + ridge),
+    :doc:`/theory/active_set` (when ``A`` is locally constant), and
+    :doc:`/theory/penalties` (per-variant ``∂_β s`` and ``∂_α s``).
     """
     n_features = problem.n_features
     penalty = problem.penalty

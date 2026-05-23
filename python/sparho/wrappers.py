@@ -347,8 +347,7 @@ class ElasticNetHO(RegressorMixin, BaseEstimator):  # type: ignore[misc]
 
     Parameters
     ----------
-    alpha_init, fit_intercept, n_iter, solver, criterion, outer, inner_tol,
-    cv_folds, random_state
+    alpha_init, fit_intercept, n_iter, solver, criterion, outer, inner_tol, cv_folds, random_state
         See :class:`LassoHO`.
     rho
         Mixing weight ``ρ ∈ (0, 1]``. ``ρ = 1`` recovers Lasso. Structural —
@@ -463,8 +462,7 @@ class LogisticRegressionHO(ClassifierMixin, BaseEstimator):  # type: ignore[misc
 
     Parameters
     ----------
-    alpha_init, n_iter, solver, criterion, outer, inner_tol, cv_folds,
-    random_state
+    alpha_init, n_iter, solver, criterion, outer, inner_tol, cv_folds, random_state
         See :class:`LassoHO`.
     fit_intercept
         Must be ``False`` in v0.3. Kept on the signature so future versions

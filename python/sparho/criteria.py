@@ -293,6 +293,17 @@ class CrossVal:
     same answer as ``warm_start=False`` because Lasso is convex. The cache is
     mutable but excluded from equality / hash so the dataclass remains a
     well-behaved value object.
+
+    See Also
+    --------
+    sparho.implicit_forward
+        Hypergradient called once per fold via ``hypergrad_fn``.
+
+    Notes
+    -----
+    The per-fold chain rule ``dC_k/dα = (∂C_k/∂β)ᵀ dβ*/dα`` and the
+    linearity-of-expectation argument behind ``CrossVal``'s aggregation
+    are covered in :doc:`/theory/criteria`.
     """
 
     folds: tuple[tuple[IndexArray, IndexArray], ...]
@@ -389,7 +400,7 @@ class CrossVal:
 
 @dataclass(frozen=True, slots=True)
 class Sure:
-    """Stein's Unbiased Risk Estimator via Finite-Difference Monte Carlo (FDMC).
+    r"""Stein's Unbiased Risk Estimator via Finite-Difference Monte Carlo (FDMC).
 
     Estimates the expected prediction-error MSE without a held-out set, for
     ``SquaredLoss`` problems with i.i.d. Gaussian observation noise of known
@@ -429,6 +440,18 @@ class Sure:
     Deledalle, Vaiter, Fadili & Peyré, *Stein Unbiased GrAdient estimator of
     the Risk (SUGAR) for multiple parameter selection*, SIAM J. Imaging
     Sci. 7(4), 2014.
+
+    See Also
+    --------
+    sparho.implicit_forward
+        Hypergradient called twice per ``value_and_hypergrad`` — once
+        per inner solve.
+
+    Notes
+    -----
+    Full SURE / SUGAR derivation, the Stein identity that justifies the
+    formula above, and the FDMC trade-off between MC variance and bias
+    of the finite-difference step are in :doc:`/theory/criteria`.
     """
 
     sigma: float

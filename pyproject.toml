@@ -72,6 +72,7 @@ docs = [
     "matplotlib>=3.8",
     "numpydoc>=1.7",
     "myst-parser>=4",
+    "sphinxcontrib-bibtex>=2.6",
 ]
 bench = [
     "libsvmdata>=0.4",

@@ -1,5 +1,12 @@
 # Concepts
 
+This page is the two-screen user-facing summary of the math. If you
+want the derivations — KKT-based implicit differentiation, the
+active-set restriction argument, per-penalty prox/Jacobian formulas,
+the SURE/SUGAR FDMC estimator, the HOAG convergence sketch — those
+live in the [Theory](theory/index.md) section. The
+{doc}`theory/index` page also fixes the notation used throughout.
+
 ## The bilevel problem
 
 Choosing a hyperparameter `α` for a non-smooth estimator can be written as

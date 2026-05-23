@@ -24,12 +24,19 @@ version = ".".join(release.split(".")[:2])
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "numpydoc",
     "myst_parser",
     "sphinx_gallery.gen_gallery",
+    "sphinxcontrib.bibtex",
 ]
+
+# Single bibliography file backing both theory pages and docstring citations.
+bibtex_bibfiles = ["refs.bib"]
+bibtex_default_style = "alpha"
+bibtex_reference_style = "author_year"
 
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 master_doc = "index"
@@ -43,6 +50,8 @@ myst_enable_extensions = [
     "deflist",
     "colon_fence",
     "smartquotes",
+    "dollarmath",
+    "amsmath",
 ]
 myst_heading_anchors = 3
 

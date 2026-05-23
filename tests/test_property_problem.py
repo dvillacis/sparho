@@ -9,9 +9,12 @@ shrinking-and-fuzzing complement.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import scipy.sparse as sp
-from hypothesis import given, settings
-from hypothesis import strategies as st
+
+pytest.importorskip("hypothesis")
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
 from sparho import (
     L1,
     ElasticNet,

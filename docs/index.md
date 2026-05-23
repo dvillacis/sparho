@@ -57,8 +57,11 @@ print(result.best_hyperparam, result.converged)
 ```
 
 See [Quickstart](quickstart.md) for an annotated walkthrough,
-[Concepts](concepts.md) for the math, and the
-[Gallery](examples_built/index.rst) for runnable end-to-end examples.
+[Concepts](concepts.md) for the math, [Theory](theory/index.md) for
+the derivations behind each step (KKT-based implicit-diff, active-set
+restriction, per-penalty kernels, criterion chain rules, HOAG
+convergence sketch), and the [Gallery](examples_built/index.rst) for
+runnable end-to-end examples.
 
 ## Contents
 
@@ -73,6 +76,19 @@ protocols
 stability
 reproducibility
 migration_from_sparse_ho
+```
+
+```{toctree}
+:caption: Theory
+:maxdepth: 1
+
+theory/index
+theory/implicit_diff
+theory/active_set
+theory/penalties
+theory/criteria
+theory/convergence
+theory/references
 ```
 
 ```{toctree}

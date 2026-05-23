@@ -8,9 +8,12 @@ naive optimum ``β = 0`` when ``α`` is large enough to suppress every feature.
 from __future__ import annotations
 
 import numpy as np
-from hypothesis import given, settings
-from hypothesis import strategies as st
-from sparho import (
+import pytest
+
+pytest.importorskip("hypothesis")
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+from sparho import (  # noqa: E402
     L1,
     HeldOutMSE,
     Problem,

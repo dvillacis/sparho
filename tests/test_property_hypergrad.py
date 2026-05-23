@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
-from sparho import L1, Problem, SquaredLoss
-from sparho.adapters import SklearnLasso
-from sparho.hypergrad import implicit_forward
+
+pytest.importorskip("hypothesis")
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+from sparho import L1, Problem, SquaredLoss  # noqa: E402
+from sparho.adapters import SklearnLasso  # noqa: E402
+from sparho.hypergrad import implicit_forward  # noqa: E402
 
 _SETTINGS = settings(max_examples=15, deadline=None)
 
