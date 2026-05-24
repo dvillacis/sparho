@@ -5,6 +5,15 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+### Dependencies
+- **scikit-learn floor bumped to `>=1.6`** (was `>=1.3`). The v0.3
+  sklearn-compatible wrappers (`LassoHO` / `ElasticNetHO` /
+  `LogisticRegressionHO`) use `sklearn.utils.validation.validate_data`
+  and `__sklearn_tags__`, both introduced in sklearn 1.6 (Dec 2024).
+  The `ci-min-deps` floor-pin job in `.github/workflows/ci.yml` is
+  bumped to match (`scikit-learn==1.6.*`). numpy / scipy floors
+  unchanged.
+
 ### Theory in docs (v0.8)
 - **`docs/theory/` section.** New self-contained derivations covering
   the bilevel setup and notation (`theory/index.md`), the KKT-restricted
