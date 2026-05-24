@@ -45,9 +45,7 @@ def _make_problem(seed: int, n_samples: int = 80, n_features: int = 12) -> Probl
 
 def _run_cv(problem: Problem, seed: int) -> tuple[float, np.ndarray]:
     solver = SklearnLasso(tol=1e-6)
-    cv = CrossVal.kfold(
-        problem.n_samples, k=5, shuffle=True, random_state=seed, base=HeldOutMSE
-    )
+    cv = CrossVal.kfold(problem.n_samples, k=5, shuffle=True, random_state=seed, base=HeldOutMSE)
     res = hoag_search(problem, 0.1, solver=solver, criterion=cv, n_iter=5, inner_tol=1e-6)
     return float(res.best_hyperparam), np.asarray(res.best_coef, dtype=np.float64)
 
@@ -60,12 +58,7 @@ def _run_sure(problem: Problem, seed: int) -> tuple[float, np.ndarray]:
 
 
 # (n_threads, seed, criterion) — keep modest so the suite stays fast.
-_MATRIX = [
-    (n, seed, crit)
-    for n in (1, 2, 4)
-    for seed in (0, 7)
-    for crit in ("cv", "sure")
-]
+_MATRIX = [(n, seed, crit) for n in (1, 2, 4) for seed in (0, 7) for crit in ("cv", "sure")]
 
 
 @pytest.mark.parametrize(

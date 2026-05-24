@@ -314,10 +314,7 @@ def main() -> int:
         if args.results_json is not None:
             args.results_json.parent.mkdir(parents=True, exist_ok=True)
             args.results_json.write_text(
-                json.dumps(
-                    {"datasets": results, "config": _config_blob(args)}, indent=2
-                )
-                + "\n"
+                json.dumps({"datasets": results, "config": _config_blob(args)}, indent=2) + "\n"
             )
             print(f"\nwrote results -> {args.results_json}")
         if args.provenance_json is not None:

@@ -119,12 +119,8 @@ def render_provenance_summary(provenance: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--results", type=Path, required=True, help="path to results JSON"
-    )
-    parser.add_argument(
-        "--provenance", type=Path, default=None, help="optional provenance JSON"
-    )
+    parser.add_argument("--results", type=Path, required=True, help="path to results JSON")
+    parser.add_argument("--provenance", type=Path, default=None, help="optional provenance JSON")
     parser.add_argument(
         "--out",
         type=Path,

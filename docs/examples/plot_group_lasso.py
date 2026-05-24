@@ -17,7 +17,6 @@ block-prox kernel, no celer dependency required.
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 from sparho import GroupL1, HeldOutMSE, Problem, SquaredLoss, hoag_search
 from sparho.adapters import GroupLassoFista
 
@@ -33,9 +32,9 @@ n_features = n_groups * group_size
 X = rng.standard_normal((n_samples, n_features))
 
 beta_true = np.zeros(n_features)
-beta_true[0:3] = [1.5, -0.8, 1.2]   # group 0 active
+beta_true[0:3] = [1.5, -0.8, 1.2]  # group 0 active
 beta_true[3:6] = [-1.0, 0.7, -0.9]  # group 1 active
-beta_true[6:9] = [0.6, 1.1, -0.5]   # group 2 active
+beta_true[6:9] = [0.6, 1.1, -0.5]  # group 2 active
 y = X @ beta_true + 0.3 * rng.standard_normal(n_samples)
 
 # %%
@@ -69,12 +68,8 @@ print(f"best α = {result.best_hyperparam:.4g}   converged: {result.converged}")
 # nonzero, modulo solver tolerance. Plot the recovered coefficient
 # magnitudes side-by-side with the true coefficients, banded by group.
 beta_hat = result.best_coef
-group_norms_true = np.array(
-    [np.linalg.norm(beta_true[list(g)]) for g in penalty.groups]
-)
-group_norms_hat = np.array(
-    [np.linalg.norm(beta_hat[list(g)]) for g in penalty.groups]
-)
+group_norms_true = np.array([np.linalg.norm(beta_true[list(g)]) for g in penalty.groups])
+group_norms_hat = np.array([np.linalg.norm(beta_hat[list(g)]) for g in penalty.groups])
 
 fig, (ax_coef, ax_groups) = plt.subplots(1, 2, figsize=(10, 4))
 xs = np.arange(n_features)

@@ -16,10 +16,9 @@ problem at the chosen α*.
 import numpy as np
 from sklearn.datasets import make_regression
 from sklearn.metrics import mean_squared_error
-
 from sparho import (
-    HeldOutMSE,
     L1,
+    HeldOutMSE,
     Problem,
     SquaredLoss,
     hoag_search,

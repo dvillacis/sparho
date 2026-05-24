@@ -79,9 +79,7 @@ def _hp_from_json(blob: dict[str, Any]) -> Any:
     return float(blob["value"])
 
 
-@pytest.mark.parametrize(
-    "fixture_path", FIXTURE_FILES, ids=lambda p: p.stem
-)
+@pytest.mark.parametrize("fixture_path", FIXTURE_FILES, ids=lambda p: p.stem)
 def test_golden_regression(fixture_path: Path) -> None:
     """Re-solve the pinned problem and assert agreement on β, loss, KKT residual."""
     fixture = json.loads(fixture_path.read_text())
@@ -89,9 +87,7 @@ def test_golden_regression(fixture_path: Path) -> None:
 
     spec = _SPECS_BY_NAME.get(name)
     if spec is None:
-        pytest.skip(
-            f"fixture {name!r} has no matching GoldenSpec — regenerate fixtures"
-        )
+        pytest.skip(f"fixture {name!r} has no matching GoldenSpec — regenerate fixtures")
 
     problem, hp = spec.builder()
     solver = spec.solver_factory()
@@ -100,9 +96,9 @@ def test_golden_regression(fixture_path: Path) -> None:
     # 1. β agreement (tight, but BLAS-tolerant).
     coef = np.asarray(result.coef, dtype=np.float64)
     expected_coef = np.asarray(fixture["coef"], dtype=np.float64)
-    assert coef.shape == expected_coef.shape, (
-        f"coef shape drift: {coef.shape} vs {expected_coef.shape}"
-    )
+    assert (
+        coef.shape == expected_coef.shape
+    ), f"coef shape drift: {coef.shape} vs {expected_coef.shape}"
     np.testing.assert_allclose(
         coef, expected_coef, atol=1e-8, rtol=1e-6, err_msg=f"{name}: coef regression"
     )
@@ -128,6 +124,6 @@ def test_golden_regression(fixture_path: Path) -> None:
     #    against algorithmic drift; coordinate values can wobble, but a
     #    feature jumping in/out of the support is always a real change).
     active = sorted(int(j) for j in result.active_set)
-    assert active == fixture["active_set"], (
-        f"{name}: active-set drift\n  was {fixture['active_set']}\n  got {active}"
-    )
+    assert (
+        active == fixture["active_set"]
+    ), f"{name}: active-set drift\n  was {fixture['active_set']}\n  got {active}"

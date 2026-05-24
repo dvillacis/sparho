@@ -9,11 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
-pytest.importorskip("hypothesis")
-from hypothesis import given, settings  # noqa: E402
-from hypothesis import strategies as st  # noqa: E402
-from sparho import (  # noqa: E402
+from sparho import (
     L1,
     HeldOutMSE,
     Problem,
@@ -21,6 +17,10 @@ from sparho import (  # noqa: E402
 )
 from sparho.adapters import SklearnLasso
 from sparho.testing import kkt_residual
+
+pytest.importorskip("hypothesis")
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
 
 _SETTINGS = settings(max_examples=20, deadline=None)
 
@@ -32,9 +32,7 @@ def _split_problem(
     n = draw(st.integers(min_value=20, max_value=80))
     p = draw(st.integers(min_value=3, max_value=20))
     seed = draw(st.integers(min_value=0, max_value=2**31 - 1))
-    val_frac = draw(
-        st.floats(min_value=0.2, max_value=0.5, allow_nan=False, allow_infinity=False)
-    )
+    val_frac = draw(st.floats(min_value=0.2, max_value=0.5, allow_nan=False, allow_infinity=False))
     rng = np.random.default_rng(seed)
     X = rng.standard_normal((n, p))
     true_beta = np.zeros(p)

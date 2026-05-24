@@ -11,10 +11,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import scipy.sparse as sp
-
-pytest.importorskip("hypothesis")
-from hypothesis import given, settings  # noqa: E402
-from hypothesis import strategies as st  # noqa: E402
 from sparho import (
     L1,
     ElasticNet,
@@ -24,6 +20,10 @@ from sparho import (
     SquaredLoss,
     WeightedL1,
 )
+
+pytest.importorskip("hypothesis")
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
 
 # Keep example counts modest so the suite remains fast on CI; coverage of
 # shrinking is the goal, not exhaustive sweep.
@@ -55,13 +55,9 @@ def test_problem_shape_invariants(design: tuple[np.ndarray, np.ndarray]) -> None
 @_DEFAULT_SETTINGS
 @given(
     design=_dense_design(),
-    rho=st.floats(
-        min_value=1e-3, max_value=1.0, allow_nan=False, allow_infinity=False
-    ),
+    rho=st.floats(min_value=1e-3, max_value=1.0, allow_nan=False, allow_infinity=False),
 )
-def test_elastic_net_rho_round_trip(
-    design: tuple[np.ndarray, np.ndarray], rho: float
-) -> None:
+def test_elastic_net_rho_round_trip(design: tuple[np.ndarray, np.ndarray], rho: float) -> None:
     """Any ``ρ ∈ (0, 1]`` round-trips through ElasticNet construction."""
     X, y = design
     problem = Problem(SquaredLoss(), ElasticNet(rho=rho), X, y)
@@ -71,13 +67,9 @@ def test_elastic_net_rho_round_trip(
 @_DEFAULT_SETTINGS
 @given(
     design=_dense_design(),
-    rho=st.floats(allow_nan=False, allow_infinity=False).filter(
-        lambda r: not (0.0 < r <= 1.0)
-    ),
+    rho=st.floats(allow_nan=False, allow_infinity=False).filter(lambda r: not (0.0 < r <= 1.0)),
 )
-def test_elastic_net_rejects_invalid_rho(
-    design: tuple[np.ndarray, np.ndarray], rho: float
-) -> None:
+def test_elastic_net_rejects_invalid_rho(design: tuple[np.ndarray, np.ndarray], rho: float) -> None:
     """Construction raises ``ValueError`` for any ``ρ`` outside ``(0, 1]``."""
     _ = design  # only need the shape strategy for parametrization
     try:

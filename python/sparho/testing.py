@@ -102,9 +102,7 @@ def _group_layout(penalty: GroupL1) -> tuple[_F64, _I32, _I32]:
     group_indices: _I32 = np.asarray(flat, dtype=np.int32)
     weights: _F64
     if penalty.weights is None:
-        weights = np.asarray(
-            [float(np.sqrt(len(g))) for g in penalty.groups], dtype=np.float64
-        )
+        weights = np.asarray([float(np.sqrt(len(g))) for g in penalty.groups], dtype=np.float64)
     else:
         weights = np.asarray(penalty.weights, dtype=np.float64)
     return weights, group_ptr, group_indices
@@ -127,9 +125,7 @@ def _prox_penalty(penalty: Penalty, z: Array, hp: Hyperparam) -> Array:
         return np.asarray(_core.prox_weighted_l1(z64, alpha))
     if isinstance(penalty, GroupL1):
         weights, group_ptr, group_indices = _group_layout(penalty)
-        return np.asarray(
-            _core.prox_group_l1(z64, float(hp), weights, group_ptr, group_indices)
-        )
+        return np.asarray(_core.prox_group_l1(z64, float(hp), weights, group_ptr, group_indices))
     assert_never(penalty)
 
 
