@@ -152,8 +152,10 @@ jobs:
       - name: pytest --doctest-modules
         # The public API is currently doctest-free, but wiring the step in
         # now means any future doctest landed in `python/sparho/` is
-        # automatically gated. Empty-collection is treated as pass.
-        run: pytest --doctest-modules python/sparho
+        # automatically gated. Pytest exits 5 on "no tests collected",
+        # which `set -e` would propagate as a step failure — the `|| [ $? -eq 5 ]`
+        # tail converts that single sentinel into a pass.
+        run: pytest --doctest-modules python/sparho || [ $? -eq 5 ]
       - name: upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
