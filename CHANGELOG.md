@@ -11,8 +11,12 @@ and Semantic Versioning.
   `LogisticRegressionHO`) use `sklearn.utils.validation.validate_data`
   and `__sklearn_tags__`, both introduced in sklearn 1.6 (Dec 2024).
   The `ci-min-deps` floor-pin job in `.github/workflows/ci.yml` is
-  bumped to match (`scikit-learn==1.6.*`). numpy / scipy floors
-  unchanged.
+  bumped to match (`scikit-learn==1.6.*`). numpy floor unchanged.
+- **scipy floor bumped to `>=1.12`** (was `>=1.10`).
+  `hypergrad.implicit_forward` passes `rtol=` and `atol=` to
+  `scipy.sparse.linalg.cg`, both introduced in scipy 1.12 (Jan 2024);
+  earlier scipy only knew the now-deprecated `tol=`. The `ci-min-deps`
+  pin matches at `scipy==1.12.*`.
 
 ### Theory in docs (v0.8)
 - **`docs/theory/` section.** New self-contained derivations covering
