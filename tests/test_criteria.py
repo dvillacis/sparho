@@ -227,15 +227,23 @@ def test_sure_rejects_non_squared_loss(cls_problem_and_split):
 def test_sure_value_reproducible_under_same_seed(denoising_problem):
     problem, _, sigma = denoising_problem
     solver = SklearnLasso(tol=1e-10, max_iter=100_000)
-    v1 = Sure(sigma=sigma, random_state=7).value(problem, 0.05, solver)
-    v2 = Sure(sigma=sigma, random_state=7).value(problem, 0.05, solver)
+    # α below α_max ≈ 0.023 on this fixture; matches the DOF-concentration
+    # test below. At α=0.05 (above α_max) β̂ ≡ 0 and the FDMC DOF term
+    # vanishes identically, making any seed-dependent SURE test trivially
+    # pass on Linux and stochastically pass on macOS — see Land v0.9 fix.
+    alpha = 5e-3
+    v1 = Sure(sigma=sigma, random_state=7).value(problem, alpha, solver)
+    v2 = Sure(sigma=sigma, random_state=7).value(problem, alpha, solver)
     assert v1 == pytest.approx(v2, rel=1e-12)
 
 
 def test_sure_value_differs_across_seeds(denoising_problem):
     problem, _, sigma = denoising_problem
     solver = SklearnLasso(tol=1e-10, max_iter=100_000)
-    values = [Sure(sigma=sigma, random_state=s).value(problem, 0.05, solver) for s in range(5)]
+    # α below α_max so β̂ has a non-trivial active set; otherwise the FDMC
+    # DOF term collapses to zero for every δ and std == 0 exactly.
+    alpha = 5e-3
+    values = [Sure(sigma=sigma, random_state=s).value(problem, alpha, solver) for s in range(5)]
     # Different δ probes ⇒ MC variance in the FDMC DOF estimate. Variance
     # should be small (sigma is small, ε is small) but strictly nonzero.
     assert float(np.std(values)) > 0.0
@@ -278,7 +286,9 @@ def test_sure_fdmc_dof_concentrates_at_lasso_support_size(denoising_problem):
 def test_sure_hypergrad_finite_difference(denoising_problem):
     problem, _, sigma = denoising_problem
     solver = SklearnLasso(tol=1e-12, max_iter=200_000)
-    alpha = 0.05
+    # α below α_max so β̂ has a non-trivial active set — otherwise both
+    # hypergrad and FD are identically zero and the test passes vacuously.
+    alpha = 5e-3
     eps = 1e-5
     crit = Sure(sigma=sigma, random_state=0)
     # Prime the probe so all three calls reuse the same δ → consistent FD.
@@ -296,10 +306,11 @@ def test_sure_warm_start_matches_cold_start(denoising_problem):
     solver = SklearnLasso(tol=1e-10, max_iter=200_000)
     cold = Sure(sigma=sigma, random_state=3, warm_start=False)
     warm = Sure(sigma=sigma, random_state=3, warm_start=True)
-    # Do an outer "iteration" so the warm cache populates, then evaluate at α.
-    _ = warm.value(problem, 0.1, solver)
-    v_cold = cold.value(problem, 0.05, solver)
-    v_warm = warm.value(problem, 0.05, solver)
+    # Both αs below α_max ≈ 0.023 so β̂ is non-trivial; otherwise warm and
+    # cold trivially agree at β̂ ≡ 0 and the test never exercises warm-start.
+    _ = warm.value(problem, 1e-2, solver)
+    v_cold = cold.value(problem, 5e-3, solver)
+    v_warm = warm.value(problem, 5e-3, solver)
     assert v_warm == pytest.approx(v_cold, rel=1e-6)
 
 
