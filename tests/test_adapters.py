@@ -66,7 +66,11 @@ def _assert_solver_result(result: SolverResult, n_features: int) -> None:
     assert result.active_set.dtype == np.int32
     # Active set must agree with nonzero pattern of coef.
     np.testing.assert_array_equal(result.active_set, np.flatnonzero(result.coef))
-    assert result.dual_gap >= 0.0
+    # Weak duality says dual_gap ≥ 0 at the optimum, but sklearn computes
+    # primal − dual via floating-point sums; near-converged solutions can
+    # land a few ulps below zero. -1e-10 absorbs that noise while still
+    # catching algorithm bugs (which would produce O(1) negative gaps).
+    assert result.dual_gap >= -1e-10
     assert result.n_iter >= 0
 
 

@@ -170,7 +170,11 @@ def test_elastic_net_ho_rho_out_of_range_raises(reg_data):
 
 
 def test_lasso_ho_dataframe_round_trip(reg_data):
-    pd = pytest.importorskip("pandas")
+    # exc_type=ImportError makes the skip-on-ImportError behavior explicit;
+    # required to silence the pytest 9.1 deprecation warning when pandas is
+    # importable as a module but its C extension is not built (the CI Linux
+    # env happens to expose this state on partial-install caches).
+    pd = pytest.importorskip("pandas", exc_type=ImportError)
     X, y = reg_data
     cols = [f"f{i}" for i in range(X.shape[1])]
     df = pd.DataFrame(X, columns=cols)
