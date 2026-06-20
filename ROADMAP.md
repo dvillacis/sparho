@@ -107,6 +107,13 @@ to v0.3 (see below).
 
 ## v0.3 — sklearn-ecosystem wrappers, SURE, structural sparsity
 
+**Released as v0.3.0 (2026-06-20).** Bundles the items below (SURE, sklearn
+wrappers, Group-L1) plus the v0.3.1 FFI-safety patch and the **hypergradient
+algo-family redesign**: the full sparse-ho `algo` family now ships as
+`hypergrad=` choices — `implicit_forward` (default; native Rust BCD Jacobian),
+`forward`, `backward`, and `implicit` (the previous CG hypergradient, renamed) —
+plus `NativeBcdLasso` and `WarmStartHypergrad`. See `CHANGELOG.md` `[0.3.0]`.
+
 Scoped from the 2026-05-20 feature-research synthesis
 (`docs/feature_research.md`): one new algorithm differentiator (SURE),
 one ergonomics unlock (sklearn wrappers + DataFrames), one structural-

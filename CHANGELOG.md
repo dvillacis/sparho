@@ -5,6 +5,8 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-20
+
 ### Hypergradient redesign — full sparse-ho algo family
 - **`hypergrad.py` is now the `hypergrad/` package.** It ports sparse-ho's
   `algo` module as four free functions on the `HypergradFn` seam:

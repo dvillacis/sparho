@@ -57,6 +57,96 @@ Once setup is complete the Zenodo work per release is small:
 
 ---
 
+# Releasing sparho v0.3.0
+
+Local prep is done (version bumped to `0.3.0`, CHANGELOG finalized, gates
+green). The Trusted Publisher and GitHub `pypi` environment carry over from
+v0.1.0/v0.2.0 — the remaining external steps are tag → CI → publish → verify.
+Zenodo DOI minting still does not apply until the first DOI-tagged release
+(`v0.5.0`, see the § above); the README BibTeX `version`/`doi` placeholders are
+left untouched.
+
+## Pre-release state (already in this repo)
+
+- `pyproject.toml`: `version = "0.3.0"`; `Cargo.toml`: `[workspace.package]
+  version = "0.3.0"`; `Cargo.lock` refreshed.
+- `CHANGELOG.md`: `[0.3.0]` section dated `2026-06-20`; fresh empty
+  `[Unreleased]` above it.
+- `ROADMAP.md`: v0.3 section marked released as v0.3.0.
+- `.github/workflows/release.yml`: unchanged — cibuildwheel + Trusted
+  Publishers, tag-triggered PyPI publish, `workflow_dispatch` dry run.
+
+## What v0.3.0 ships (user-visible delta since 0.2.0)
+
+- **Hypergradient algo-family redesign (headline).** `hypergrad.py` → the
+  `hypergrad/` package porting sparse-ho's `algo` family as `hypergrad=`
+  choices: `implicit_forward` (default; native Rust BCD Jacobian on the active
+  set, dense + CSC, for `SquaredLoss × {L1, ElasticNet, WeightedL1}`), `forward`
+  (joint solve), `backward` (reverse-mode), `implicit` (the previous CG
+  hypergradient, renamed; the fallback for `LogisticLoss` / `GroupL1` and home
+  of the `ridge` knob). New `NativeBcdLasso` adapter and `WarmStartHypergrad`.
+  **Breaking:** `implicit_forward`'s algorithm changed (BCD, not CG); the old
+  behavior is `implicit`.
+- `Sure` criterion (FDMC SURE/SUGAR); sklearn-compatible wrappers (`LassoHO`,
+  `ElasticNetHO`, `LogisticRegressionHO`); `GroupL1` penalty + `GroupLassoFista`.
+- FFI-safety hardening of the Rust kernels (bounds-checked `as usize` casts).
+- Dependency floors bumped: `scikit-learn >= 1.6`, `scipy >= 1.12`; sklearn 1.8
+  `penalty=`/`l1_ratio=` compat in the logistic adapter.
+- `docs/theory/` derivations; new gallery example comparing the hypergradient
+  algorithms (`docs/examples/plot_compare_hypergrad.py`).
+
+See `CHANGELOG.md` `[0.3.0]` for the full list.
+
+## External steps the user has to drive
+
+### 1. Commit the v0.3.0 prep
+
+Already committed on `main` during prep (`git log` is authoritative). If you
+need to amend, the touched files are `pyproject.toml`, `Cargo.toml`,
+`Cargo.lock`, `CHANGELOG.md`, `ROADMAP.md`, `RELEASE.md`.
+
+### 2. Dry-run the wheel matrix on CI
+
+```bash
+gh workflow run release.yml
+gh run watch
+```
+
+### 3. Tag + publish to PyPI
+
+```bash
+git tag -a v0.3.0 -m "v0.3.0 — hypergradient algo-family redesign + v0.3 features"
+git push origin v0.3.0
+```
+
+The `publish` job uploads to PyPI via the Trusted Publisher OIDC (no token).
+
+### 4. Verify the PyPI install
+
+```bash
+python3.12 -m venv /tmp/sparho-pypi && source /tmp/sparho-pypi/bin/activate
+pip install sparho==0.3.0
+python -c "import sparho; print(sparho.__version__)"
+python -c "from sparho.hypergrad import forward, backward, implicit, implicit_forward; print('algo family OK')"
+```
+
+Then run `docs/examples/plot_compare_hypergrad.py` end-to-end.
+
+### 5. GitHub release
+
+```bash
+gh release create v0.3.0 --title "sparho v0.3.0" --notes-file CHANGELOG.md
+```
+
+Edit the rendered notes to focus on the `[0.3.0]` block.
+
+### 6. Post-release
+
+Bump `pyproject.toml` to `0.4.0.dev0` on a `bump-dev` commit (the
+`[Unreleased]` CHANGELOG section was already re-added during prep).
+
+---
+
 # Releasing sparho v0.2.0
 
 Local prep is done (version bumped, gates green, sdist + wheel built,

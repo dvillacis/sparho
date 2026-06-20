@@ -555,7 +555,7 @@ dependencies = [
 
 [[package]]
 name = "sparho-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ndarray",
  "num-traits",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "sparho-py"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ndarray",
  "numpy",
