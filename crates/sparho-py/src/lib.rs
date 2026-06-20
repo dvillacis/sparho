@@ -312,6 +312,341 @@ fn restricted_ls_hessian_matvec<'py>(
     Ok(out)
 }
 
+// ---------------------------------------------------------------- bcd
+
+/// Return type of a BCD inner solve: `(beta, n_iter, dual_gap)`.
+type BcdResult<'py> = (Bound<'py, PyArray1<f64>>, usize, f64);
+
+/// Return type of a joint β+Jacobian solve: `(beta, dbeta, n_iter, dual_gap)`.
+type BcdJacResult<'py> = (
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    usize,
+    f64,
+);
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bcd_lasso_dense<'py>(
+    py: Python<'py>,
+    x: PyReadonlyArray1<'py, f64>,
+    n_samples: usize,
+    n_features: usize,
+    y: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    beta0: PyReadonlyArray1<'py, f64>,
+    lipschitz: PyReadonlyArray1<'py, f64>,
+    max_iter: usize,
+    tol: f64,
+    gap_freq: usize,
+) -> PyResult<BcdResult<'py>> {
+    let x_s = x.as_slice()?;
+    let y_s = y.as_slice()?;
+    let beta0_s = beta0.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    if beta0_s.len() != n_features {
+        return Err(PyValueError::new_err("beta0 length must equal n_features"));
+    }
+    let beta = PyArray1::<f64>::zeros_bound(py, n_features, false);
+    let mut resid = vec![0.0; n_samples];
+    let (n_iter, gap);
+    {
+        let mut beta_rw = beta.readwrite();
+        let beta_mut = beta_rw.as_slice_mut()?;
+        beta_mut.copy_from_slice(beta0_s);
+        let out = sparho_core::bcd::bcd_lasso_dense(
+            x_s, n_samples, n_features, y_s, alpha, beta_mut, &mut resid, l_s, max_iter, tol,
+            gap_freq,
+        )
+        .map_err(map_kernel_err)?;
+        n_iter = out.0;
+        gap = out.1;
+    }
+    Ok((beta, n_iter, gap))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bcd_lasso_csc<'py>(
+    py: Python<'py>,
+    indptr: PyReadonlyArray1<'py, i32>,
+    indices: PyReadonlyArray1<'py, i32>,
+    data: PyReadonlyArray1<'py, f64>,
+    n_samples: usize,
+    y: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    beta0: PyReadonlyArray1<'py, f64>,
+    lipschitz: PyReadonlyArray1<'py, f64>,
+    max_iter: usize,
+    tol: f64,
+    gap_freq: usize,
+) -> PyResult<BcdResult<'py>> {
+    let indptr_s = indptr.as_slice()?;
+    let indices_s = indices.as_slice()?;
+    let data_s = data.as_slice()?;
+    let y_s = y.as_slice()?;
+    let beta0_s = beta0.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    if indptr_s.is_empty() {
+        return Err(PyValueError::new_err("indptr must be non-empty"));
+    }
+    let n_features = indptr_s.len() - 1;
+    if beta0_s.len() != n_features {
+        return Err(PyValueError::new_err("beta0 length must equal n_features"));
+    }
+    let beta = PyArray1::<f64>::zeros_bound(py, n_features, false);
+    let mut resid = vec![0.0; n_samples];
+    let (n_iter, gap);
+    {
+        let mut beta_rw = beta.readwrite();
+        let beta_mut = beta_rw.as_slice_mut()?;
+        beta_mut.copy_from_slice(beta0_s);
+        let out = sparho_core::bcd::bcd_lasso_csc(
+            indptr_s, indices_s, data_s, n_samples, y_s, alpha, beta_mut, &mut resid, l_s,
+            max_iter, tol, gap_freq,
+        )
+        .map_err(map_kernel_err)?;
+        n_iter = out.0;
+        gap = out.1;
+    }
+    Ok((beta, n_iter, gap))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bcd_lasso_jac_dense<'py>(
+    py: Python<'py>,
+    x: PyReadonlyArray1<'py, f64>,
+    n_samples: usize,
+    n_features: usize,
+    y: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    beta0: PyReadonlyArray1<'py, f64>,
+    dbeta0: PyReadonlyArray1<'py, f64>,
+    lipschitz: PyReadonlyArray1<'py, f64>,
+    max_iter: usize,
+    tol: f64,
+    gap_freq: usize,
+) -> PyResult<BcdJacResult<'py>> {
+    let x_s = x.as_slice()?;
+    let y_s = y.as_slice()?;
+    let beta0_s = beta0.as_slice()?;
+    let dbeta0_s = dbeta0.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    if beta0_s.len() != n_features || dbeta0_s.len() != n_features {
+        return Err(PyValueError::new_err(
+            "beta0 and dbeta0 length must equal n_features",
+        ));
+    }
+    let beta = PyArray1::<f64>::zeros_bound(py, n_features, false);
+    let dbeta = PyArray1::<f64>::zeros_bound(py, n_features, false);
+    let mut resid = vec![0.0; n_samples];
+    let mut dresid = vec![0.0; n_samples];
+    let (n_iter, gap);
+    {
+        let mut beta_rw = beta.readwrite();
+        let mut dbeta_rw = dbeta.readwrite();
+        let beta_mut = beta_rw.as_slice_mut()?;
+        let dbeta_mut = dbeta_rw.as_slice_mut()?;
+        beta_mut.copy_from_slice(beta0_s);
+        dbeta_mut.copy_from_slice(dbeta0_s);
+        let out = sparho_core::bcd::bcd_lasso_jac_dense(
+            x_s,
+            n_samples,
+            n_features,
+            y_s,
+            alpha,
+            beta_mut,
+            dbeta_mut,
+            &mut resid,
+            &mut dresid,
+            l_s,
+            max_iter,
+            tol,
+            gap_freq,
+        )
+        .map_err(map_kernel_err)?;
+        n_iter = out.0;
+        gap = out.1;
+    }
+    Ok((beta, dbeta, n_iter, gap))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bcd_lasso_jac_csc<'py>(
+    py: Python<'py>,
+    indptr: PyReadonlyArray1<'py, i32>,
+    indices: PyReadonlyArray1<'py, i32>,
+    data: PyReadonlyArray1<'py, f64>,
+    n_samples: usize,
+    y: PyReadonlyArray1<'py, f64>,
+    alpha: f64,
+    beta0: PyReadonlyArray1<'py, f64>,
+    dbeta0: PyReadonlyArray1<'py, f64>,
+    lipschitz: PyReadonlyArray1<'py, f64>,
+    max_iter: usize,
+    tol: f64,
+    gap_freq: usize,
+) -> PyResult<BcdJacResult<'py>> {
+    let indptr_s = indptr.as_slice()?;
+    let indices_s = indices.as_slice()?;
+    let data_s = data.as_slice()?;
+    let y_s = y.as_slice()?;
+    let beta0_s = beta0.as_slice()?;
+    let dbeta0_s = dbeta0.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    if indptr_s.is_empty() {
+        return Err(PyValueError::new_err("indptr must be non-empty"));
+    }
+    let n_features = indptr_s.len() - 1;
+    if beta0_s.len() != n_features || dbeta0_s.len() != n_features {
+        return Err(PyValueError::new_err(
+            "beta0 and dbeta0 length must equal n_features",
+        ));
+    }
+    let beta = PyArray1::<f64>::zeros_bound(py, n_features, false);
+    let dbeta = PyArray1::<f64>::zeros_bound(py, n_features, false);
+    let mut resid = vec![0.0; n_samples];
+    let mut dresid = vec![0.0; n_samples];
+    let (n_iter, gap);
+    {
+        let mut beta_rw = beta.readwrite();
+        let mut dbeta_rw = dbeta.readwrite();
+        let beta_mut = beta_rw.as_slice_mut()?;
+        let dbeta_mut = dbeta_rw.as_slice_mut()?;
+        beta_mut.copy_from_slice(beta0_s);
+        dbeta_mut.copy_from_slice(dbeta0_s);
+        let out = sparho_core::bcd::bcd_lasso_jac_csc(
+            indptr_s,
+            indices_s,
+            data_s,
+            n_samples,
+            y_s,
+            alpha,
+            beta_mut,
+            dbeta_mut,
+            &mut resid,
+            &mut dresid,
+            l_s,
+            max_iter,
+            tol,
+            gap_freq,
+        )
+        .map_err(map_kernel_err)?;
+        n_iter = out.0;
+        gap = out.1;
+    }
+    Ok((beta, dbeta, n_iter, gap))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bcd_lasso_backward_dense(
+    x: PyReadonlyArray1<'_, f64>,
+    n_samples: usize,
+    n_features: usize,
+    y: PyReadonlyArray1<'_, f64>,
+    alpha: f64,
+    v: PyReadonlyArray1<'_, f64>,
+    lipschitz: PyReadonlyArray1<'_, f64>,
+    max_iter: usize,
+    tol: f64,
+    gap_freq: usize,
+) -> PyResult<(f64, usize)> {
+    let x_s = x.as_slice()?;
+    let y_s = y.as_slice()?;
+    let v_s = v.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    let (grad, n_iter) = sparho_core::bcd::bcd_lasso_backward_dense(
+        x_s, n_samples, n_features, y_s, alpha, v_s, l_s, max_iter, tol, gap_freq,
+    )
+    .map_err(map_kernel_err)?;
+    Ok((grad, n_iter))
+}
+
+/// Return type of a restricted normal-equation solve: `(x, n_iter)`.
+type SolveResult<'py> = (Bound<'py, PyArray1<f64>>, usize);
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn solve_restricted_normal_dense<'py>(
+    py: Python<'py>,
+    xs: PyReadonlyArray1<'py, f64>,
+    n_samples: usize,
+    n_active: usize,
+    b: PyReadonlyArray1<'py, f64>,
+    diag_shift: f64,
+    x0: PyReadonlyArray1<'py, f64>,
+    lipschitz: PyReadonlyArray1<'py, f64>,
+    max_iter: usize,
+    tol: f64,
+) -> PyResult<SolveResult<'py>> {
+    let xs_s = xs.as_slice()?;
+    let b_s = b.as_slice()?;
+    let x0_s = x0.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    if x0_s.len() != n_active {
+        return Err(PyValueError::new_err("x0 length must equal n_active"));
+    }
+    let x = PyArray1::<f64>::zeros_bound(py, n_active, false);
+    let mut q = vec![0.0; n_samples];
+    let n_iter;
+    {
+        let mut x_rw = x.readwrite();
+        let x_mut = x_rw.as_slice_mut()?;
+        x_mut.copy_from_slice(x0_s);
+        n_iter = sparho_core::bcd::solve_restricted_normal_dense(
+            xs_s, n_samples, n_active, b_s, diag_shift, x_mut, &mut q, l_s, max_iter, tol,
+        )
+        .map_err(map_kernel_err)?;
+    }
+    Ok((x, n_iter))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn solve_restricted_normal_csc<'py>(
+    py: Python<'py>,
+    indptr: PyReadonlyArray1<'py, i32>,
+    indices: PyReadonlyArray1<'py, i32>,
+    data: PyReadonlyArray1<'py, f64>,
+    n_samples: usize,
+    active: PyReadonlyArray1<'py, i32>,
+    b: PyReadonlyArray1<'py, f64>,
+    diag_shift: f64,
+    x0: PyReadonlyArray1<'py, f64>,
+    lipschitz: PyReadonlyArray1<'py, f64>,
+    max_iter: usize,
+    tol: f64,
+) -> PyResult<SolveResult<'py>> {
+    let indptr_s = indptr.as_slice()?;
+    let indices_s = indices.as_slice()?;
+    let data_s = data.as_slice()?;
+    let active_s = active.as_slice()?;
+    let b_s = b.as_slice()?;
+    let x0_s = x0.as_slice()?;
+    let l_s = lipschitz.as_slice()?;
+    let n_active = active_s.len();
+    if x0_s.len() != n_active {
+        return Err(PyValueError::new_err("x0 length must equal active length"));
+    }
+    let x = PyArray1::<f64>::zeros_bound(py, n_active, false);
+    let mut q = vec![0.0; n_samples];
+    let n_iter;
+    {
+        let mut x_rw = x.readwrite();
+        let x_mut = x_rw.as_slice_mut()?;
+        x_mut.copy_from_slice(x0_s);
+        n_iter = sparho_core::bcd::solve_restricted_normal_csc(
+            indptr_s, indices_s, data_s, n_samples, active_s, b_s, diag_shift, x_mut, &mut q, l_s,
+            max_iter, tol,
+        )
+        .map_err(map_kernel_err)?;
+    }
+    Ok((x, n_iter))
+}
+
 // ---------------------------------------------------------------- module
 
 #[pymodule]
@@ -333,5 +668,13 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(csc_rmatvec, m)?)?;
     // residual
     m.add_function(wrap_pyfunction!(restricted_ls_hessian_matvec, m)?)?;
+    // bcd
+    m.add_function(wrap_pyfunction!(bcd_lasso_dense, m)?)?;
+    m.add_function(wrap_pyfunction!(bcd_lasso_csc, m)?)?;
+    m.add_function(wrap_pyfunction!(bcd_lasso_jac_dense, m)?)?;
+    m.add_function(wrap_pyfunction!(bcd_lasso_jac_csc, m)?)?;
+    m.add_function(wrap_pyfunction!(bcd_lasso_backward_dense, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_restricted_normal_dense, m)?)?;
+    m.add_function(wrap_pyfunction!(solve_restricted_normal_csc, m)?)?;
     Ok(())
 }

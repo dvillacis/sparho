@@ -97,7 +97,8 @@ See `docs/migration_from_sparse_ho.md` for translation from sparse-ho's API.
 
 - **One `Problem` dataclass.** No abstract base class tower. Algorithms are
   free functions over `Problem`. Typing via `typing.Protocol`.
-- **Implicit-only at v0.1.** ImplicitForward is the only hypergradient mode.
+- **Full hypergradient family; ImplicitForward by default.** `implicit_forward`,
+  `forward`, `backward`, and `implicit` all ship as `hypergrad=` choices.
 - **Sparse-X first class.** CSC iterated directly in Rust; no densification.
 - **Rust kernels via PyO3 + maturin + ABI3.** Single binary wheel, no numba.
 - **Clean break from sparse-ho.** Migration guide rather than compat shim.

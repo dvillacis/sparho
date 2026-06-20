@@ -5,6 +5,36 @@ and Semantic Versioning.
 
 ## [Unreleased]
 
+### Hypergradient redesign — full sparse-ho algo family
+- **`hypergrad.py` is now the `hypergrad/` package.** It ports sparse-ho's
+  `algo` module as four free functions on the `HypergradFn` seam:
+  `implicit_forward` (the **default**), `forward`, `backward`, and `implicit`.
+  Select one by passing it to `grad_search` / `hoag_search`, or look it up with
+  `get_hypergrad(name)`.
+- **`implicit_forward` now runs a native BCD Jacobian fixed point** (Rust
+  `crates/sparho-core/src/bcd.rs`) restricted to the active set, for
+  `SquaredLoss × {L1, ElasticNet, WeightedL1}`, dense and CSC. It matches the
+  previous CG result and finite differences to ~1e-10. `LogisticLoss` and
+  `GroupL1` fall back to the CG path.
+- **BREAKING: `implicit_forward`'s algorithm changed.** It was sparse-ho's
+  `Implicit` (matrix-free CG on the restricted KKT Hessian); that exact code now
+  ships unchanged as `sparho.hypergrad.implicit`. The `ridge` stabilization knob
+  lives only on `implicit` (a BCD fixed point has no Hessian to regularize); it
+  is accepted-but-ignored on the BCD paths. Code that relied on `ridge` or on
+  CG-specific singular-system behavior should call `implicit` directly.
+- **`forward`** re-solves the inner problem from cold while propagating the full
+  Jacobian (joint solve); **`backward`** records β sweeps and reverse-replays
+  (dense L1; other cases delegate). Both equal `implicit_forward` at the optimum.
+- **`NativeBcdLasso`** adapter — sparho's own Rust coordinate-descent inner
+  solver for `Problem(SquaredLoss, L1, …)` (matches `SklearnLasso` to ~1e-12),
+  alongside the existing external adapters.
+- **`WarmStartHypergrad`** — opt-in wrapper that caches the support Jacobian and
+  remaps it across outer iterations (warm-starts the fixed point; same answer,
+  fewer sweeps).
+- New Rust kernels exposed via `_core`: `bcd_lasso_{dense,csc}`,
+  `bcd_lasso_jac_{dense,csc}`, `bcd_lasso_backward_dense`,
+  `solve_restricted_normal_{dense,csc}` (the `(XsᵀXs/n + cI)x = b` primitive).
+
 ### Dependencies
 - **scikit-learn floor bumped to `>=1.6`** (was `>=1.3`). The v0.3
   sklearn-compatible wrappers (`LassoHO` / `ElasticNetHO` /

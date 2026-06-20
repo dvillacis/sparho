@@ -17,7 +17,11 @@ from .criteria import (
     HeldOutMSE,
     Sure,
 )
-from .hypergrad import implicit_forward
+from .hypergrad import WarmStartHypergrad, get_hypergrad
+from .hypergrad.backward import backward
+from .hypergrad.forward import forward
+from .hypergrad.implicit import implicit
+from .hypergrad.implicit_forward import implicit_forward
 from .problem import (
     L1,
     Datafit,
@@ -76,7 +80,12 @@ __all__ = [
     # hypergradient + search
     "grad_search",
     "hoag_search",
+    "get_hypergrad",
+    "backward",
+    "forward",
+    "implicit",
     "implicit_forward",
+    "WarmStartHypergrad",
     # sklearn-compatible wrappers
     "ElasticNetHO",
     "LassoHO",

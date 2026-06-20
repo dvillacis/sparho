@@ -483,7 +483,7 @@ each ships an independently releasable artifact.
   CG output produces a zero hypergradient with `RuntimeWarning` rather
   than propagating to a `α = nan` crash. NaN-guards added to
   `LineSearch`, `GradDescent`, and `grad_search`. Regression tests for
-  near-singular Hessians (`tests/test_hypergrad.py::test_implicit_forward_ridge_*`)
+  near-singular Hessians (`tests/test_hypergrad.py::test_implicit_ridge_*`)
   and NaN-handling (`tests/test_optimizer.py::test_*_holds_param_on_*`).
 
 ## Deferred / out of scope

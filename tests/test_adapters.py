@@ -19,6 +19,7 @@ from sparho import (
     WeightedL1,
 )
 from sparho.adapters import (
+    NativeBcdLasso,
     SklearnElasticNet,
     SklearnLasso,
     SklearnLogisticRegression,
@@ -170,6 +171,60 @@ def test_sklearn_logreg_rejects_unscaled_labels(cls_dense):
     problem = Problem(LogisticLoss(), L1(), X, y_01)
     with pytest.raises(ValueError):
         SklearnLogisticRegression()(problem, 0.05)
+
+
+# ---------------------------------------------------------------- NativeBcdLasso
+
+
+def test_native_bcd_lasso_matches_sklearn_dense(reg_dense):
+    X, y = reg_dense
+    problem = Problem(SquaredLoss(), L1(), X, y)
+    r_sk = SklearnLasso(tol=1e-10, max_iter=100_000)(problem, 0.1)
+    r_bcd = NativeBcdLasso(tol=1e-12, max_iter=100_000)(problem, 0.1)
+    _assert_solver_result(r_bcd, problem.n_features)
+    np.testing.assert_allclose(r_bcd.coef, r_sk.coef, atol=1e-7, rtol=1e-5)
+    assert r_bcd.dual_gap >= -1e-12
+    assert r_bcd.n_iter < 100_000
+
+
+def test_native_bcd_lasso_matches_sklearn_sparse(reg_sparse):
+    X, y = reg_sparse
+    problem = Problem(SquaredLoss(), L1(), X, y)
+    r_sk = SklearnLasso(tol=1e-10, max_iter=100_000)(problem, 0.05)
+    r_bcd = NativeBcdLasso(tol=1e-12, max_iter=100_000)(problem, 0.05)
+    _assert_solver_result(r_bcd, problem.n_features)
+    np.testing.assert_allclose(r_bcd.coef, r_sk.coef, atol=1e-7, rtol=1e-5)
+
+
+def test_native_bcd_lasso_dense_csc_agree(reg_dense):
+    X, y = reg_dense
+    p_dense = Problem(SquaredLoss(), L1(), X, y)
+    p_csc = Problem(SquaredLoss(), L1(), sp.csc_matrix(X), y)
+    r_dense = NativeBcdLasso(tol=1e-12, max_iter=100_000)(p_dense, 0.1)
+    r_csc = NativeBcdLasso(tol=1e-12, max_iter=100_000)(p_csc, 0.1)
+    np.testing.assert_allclose(r_dense.coef, r_csc.coef, atol=1e-9, rtol=1e-9)
+
+
+def test_native_bcd_lasso_warm_start(reg_dense):
+    X, y = reg_dense
+    problem = Problem(SquaredLoss(), L1(), X, y)
+    solver = NativeBcdLasso(tol=1e-12, max_iter=100_000)
+    r1 = solver(problem, 0.1)
+    # Re-solving from the converged coef must reproduce it with a tiny gap.
+    r2 = solver(problem, 0.1, x0=r1.coef)
+    np.testing.assert_allclose(r2.coef, r1.coef, atol=1e-9, rtol=1e-9)
+    assert r2.dual_gap >= -1e-12
+
+
+def test_native_bcd_lasso_rejects_wrong_problem(reg_dense):
+    X, y = reg_dense
+    problem = Problem(SquaredLoss(), ElasticNet(rho=0.5), X, y)
+    with pytest.raises(TypeError):
+        NativeBcdLasso()(problem, 0.1)
+
+
+def test_native_bcd_lasso_protocol_isinstance():
+    assert isinstance(NativeBcdLasso(), Solver)
 
 
 # ---------------------------------------------------------------- celer (optional)

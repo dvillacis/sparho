@@ -42,3 +42,104 @@ def restricted_ls_hessian_matvec(
     active: _I32,
     v: _F64,
 ) -> _F64: ...
+
+# block-coordinate-descent inner solvers (β-only; returns (beta, n_iter, dual_gap)).
+# Dense ``x`` is column-major (Fortran) flattened: column j is x[j*n_samples:(j+1)*n_samples].
+def bcd_lasso_dense(
+    x: _F64,
+    n_samples: int,
+    n_features: int,
+    y: _F64,
+    alpha: float,
+    beta0: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+    gap_freq: int,
+) -> tuple[_F64, int, float]: ...
+def bcd_lasso_csc(
+    indptr: _I32,
+    indices: _I32,
+    data: _F64,
+    n_samples: int,
+    y: _F64,
+    alpha: float,
+    beta0: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+    gap_freq: int,
+) -> tuple[_F64, int, float]: ...
+
+# Joint β+Jacobian BCD solve (Forward); returns (beta, dbeta, n_iter, dual_gap).
+# Tracks dβ/dα over all features alongside β. Dense ``x`` is column-major.
+def bcd_lasso_jac_dense(
+    x: _F64,
+    n_samples: int,
+    n_features: int,
+    y: _F64,
+    alpha: float,
+    beta0: _F64,
+    dbeta0: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+    gap_freq: int,
+) -> tuple[_F64, _F64, int, float]: ...
+def bcd_lasso_jac_csc(
+    indptr: _I32,
+    indices: _I32,
+    data: _F64,
+    n_samples: int,
+    y: _F64,
+    alpha: float,
+    beta0: _F64,
+    dbeta0: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+    gap_freq: int,
+) -> tuple[_F64, _F64, int, float]: ...
+
+# Reverse-mode (Backward) hypergradient for dense Lasso; returns (dC_dalpha, n_iter).
+# Solves while recording β sweeps, then reverse-replays. ``v`` is ∂C/∂β (length n_features).
+def bcd_lasso_backward_dense(
+    x: _F64,
+    n_samples: int,
+    n_features: int,
+    y: _F64,
+    alpha: float,
+    v: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+    gap_freq: int,
+) -> tuple[float, int]: ...
+
+# Restricted normal-equation solve (ImplicitForward primitive); returns (x, n_iter).
+# Solves (XsᵀXs/n + diag_shift·I) x = b on the support by coordinate descent.
+# Dense ``xs`` is column-major; the CSC variant takes the full matrix + ``active``.
+def solve_restricted_normal_dense(
+    xs: _F64,
+    n_samples: int,
+    n_active: int,
+    b: _F64,
+    diag_shift: float,
+    x0: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+) -> tuple[_F64, int]: ...
+def solve_restricted_normal_csc(
+    indptr: _I32,
+    indices: _I32,
+    data: _F64,
+    n_samples: int,
+    active: _I32,
+    b: _F64,
+    diag_shift: float,
+    x0: _F64,
+    lipschitz: _F64,
+    max_iter: int,
+    tol: float,
+) -> tuple[_F64, int]: ...

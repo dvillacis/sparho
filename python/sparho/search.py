@@ -34,7 +34,7 @@ import numpy as np
 
 from .core.types import Hyperparam
 from .criteria import Criterion
-from .hypergrad import implicit_forward
+from .hypergrad.implicit_forward import implicit_forward
 from .problem import Problem
 from .solver import Solver
 from .state import IterationRecord, SearchResult

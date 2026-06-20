@@ -128,7 +128,8 @@ union shape is a deliberate v0.1 constraint.
 
 ## Hypergradient function
 
-`implicit_forward` is the only mode at v0.1. The function signature is
+`implicit_forward` is the default; `forward`, `backward`, and `implicit` ship
+alongside it (and `WarmStartHypergrad` wraps any of them). The shared signature is
 
 ```python
 HypergradFn = Callable[..., Hyperparam]
@@ -141,8 +142,6 @@ Both `grad_search` and `hoag_search` accept it as an optional kwarg:
 hoag_search(problem, hp0=1e-2, solver=..., criterion=..., hypergrad=my_hg)
 ```
 
-Anything with that signature works. The v0.1 design assumes implicit
-differentiation; unrolled / forward-mode hypergradients are deferred to
-v0.2. If you're writing one, look at `implicit_forward`'s sparse-X
-machinery in `python/sparho/hypergrad.py` — the Rust kernels for
-restricted Hessian matvecs are usable as-is.
+Anything with that signature works. If you're writing one, look at the
+`python/sparho/hypergrad/` package — the Rust BCD / restricted-Hessian kernels
+in `crates/sparho-core/src/bcd.rs` (and `residual.rs`) are usable as-is.

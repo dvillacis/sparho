@@ -29,7 +29,7 @@ from sparho.adapters import (
     SklearnLogisticRegression,
     SklearnWeightedLasso,
 )
-from sparho.hypergrad import implicit_forward
+from sparho.hypergrad import implicit, implicit_forward
 
 # ---------------------------------------------------------------- fixtures
 
@@ -293,6 +293,13 @@ def test_implicit_forward_empty_active_set_vector():
 
 
 # ---------------------------------------------------------------- ridge guard
+#
+# ``ridge`` stabilization is a property of the CG algorithm (:func:`implicit`),
+# not of the BCD ImplicitForward path — a coordinate-descent fixed point has no
+# Hessian to regularize. These tests therefore target ``implicit`` directly;
+# ``implicit_forward`` routes ``(SquaredLoss, L1)`` to the BCD kernel, which has
+# no ``ridge`` parameter and converges to a finite (if non-unique) value on a
+# singular active set rather than warning.
 
 
 def _near_singular_problem() -> tuple[Problem, SolverResult, np.ndarray]:
@@ -319,24 +326,24 @@ def _near_singular_problem() -> tuple[Problem, SolverResult, np.ndarray]:
     return problem, result, crit_w
 
 
-def test_implicit_forward_ridge_auto_recovers_on_singular():
+def test_implicit_ridge_auto_recovers_on_singular():
     problem, result, crit_w = _near_singular_problem()
-    hg = implicit_forward(problem, 0.05, result, crit_w)  # ridge=None → auto
+    hg = implicit(problem, 0.05, result, crit_w)  # ridge=None → auto
     assert np.isfinite(hg), "auto-ridge must return a finite hypergradient"
 
 
-def test_implicit_forward_ridge_zero_warns_and_returns_zero():
+def test_implicit_ridge_zero_warns_and_returns_zero():
     problem, result, crit_w = _near_singular_problem()
     with pytest.warns(RuntimeWarning, match="CG failed"):
-        hg = implicit_forward(problem, 0.05, result, crit_w, ridge=0.0)
+        hg = implicit(problem, 0.05, result, crit_w, ridge=0.0)
     assert hg == 0.0, "ridge=0 + singular system must return the zero sentinel"
 
 
-def test_implicit_forward_ridge_bias_is_benign_on_well_conditioned(lasso_problem):
+def test_implicit_ridge_bias_is_benign_on_well_conditioned(lasso_problem):
     problem, crit_w = lasso_problem
     solver = SklearnLasso(tol=1e-9)
     sr = solver(problem, 0.05)
-    hg_no_ridge = implicit_forward(problem, 0.05, sr, crit_w, ridge=0.0)
-    hg_auto = implicit_forward(problem, 0.05, sr, crit_w)
+    hg_no_ridge = implicit(problem, 0.05, sr, crit_w, ridge=0.0)
+    hg_auto = implicit(problem, 0.05, sr, crit_w)
     # Default ridge_rel=1e-10 should perturb the answer by far less than 1 %.
     np.testing.assert_allclose(hg_auto, hg_no_ridge, rtol=1e-3, atol=1e-8)

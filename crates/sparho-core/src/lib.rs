@@ -3,6 +3,7 @@
 //! All public functions take input slices and write into caller-provided
 //! output slices to keep the PyO3 hot path allocation-free.
 
+pub mod bcd;
 pub mod csc;
 pub mod kernels;
 pub mod prox;

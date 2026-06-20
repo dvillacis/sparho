@@ -50,9 +50,18 @@ naive fixed-`lr` outer loop (sparse-ho's `GradientDescent` optimizer).
 
 | sparse-ho `algo` | sparho `hypergrad=` | Notes |
 |---|---|---|
-| `ImplicitForward(...)` | `implicit_forward` (the default) | The only mode at v0.1. |
-| `Implicit(...)`, `ImplicitVariational(...)` | not at v0.1 | Deferred. |
-| `Forward(...)`, `Backward(...)` | not at v0.1 | Unrolled modes deferred. |
+| `ImplicitForward(...)` | `implicit_forward` (the default) | Native BCD Jacobian fixed point on the active set (Rust). |
+| `Forward(...)` | `forward` | Joint β+Jacobian solve. Same result as `implicit_forward`; recomputes β. |
+| `Backward(...)` | `backward` | Reverse-mode replay (dense L1; other cases delegate to `implicit_forward`). |
+| `Implicit(...)` | `implicit` | Matrix-free CG on the restricted KKT Hessian; the universal fallback. Owns the `ridge` knob. |
+| `ImplicitVariational(...)` | not yet | Deferred. |
+
+Pass the function itself (`hypergrad=sparho.forward`) or look it up by name with
+`sparho.get_hypergrad("forward")`. The four agree numerically at the optimum;
+`implicit_forward` is the efficient default. Note `sparho.implicit_forward` is
+the BCD ImplicitForward — sparse-ho's *Implicit* (CG) algorithm is
+`sparho.implicit`. Wrap any of them in `sparho.WarmStartHypergrad(...)` to
+warm-start the Jacobian across outer iterations.
 
 ### Criteria
 
