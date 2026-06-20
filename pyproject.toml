@@ -135,15 +135,6 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "bench: marks tests that are benchmark-adjacent",
 ]
-filterwarnings = [
-    # sklearn 1.8+ deprecates `penalty=` on LogisticRegression in favor of
-    # `l1_ratio=`. The old kwarg still works; migrate when the minimum
-    # supported sklearn is bumped to 1.8+. Both messages contain a literal
-    # ":" which collides with pytest's filterwarnings field separator, so
-    # we suppress by category + emitting module instead.
-    "ignore::FutureWarning:sklearn.linear_model._logistic",
-    "ignore::UserWarning:sklearn.linear_model._logistic",
-]
 
 [tool.mypy]
 python_version = "3.11"

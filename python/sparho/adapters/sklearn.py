@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import scipy.sparse as sp
+from sklearn import __version__ as _sklearn_version
 from sklearn.linear_model import ElasticNet, Lasso, LogisticRegression
 
 from ..core.types import Array, Hyperparam
@@ -191,9 +192,30 @@ class SklearnWeightedLasso:
 # ---------------------------------------------------------------- Logistic + L1
 
 
+def _l1_logreg_kwargs() -> dict[str, object]:
+    """Select the kwarg requesting an L1 penalty from ``LogisticRegression``.
+
+    sklearn 1.8 deprecated ``penalty=`` in favour of ``l1_ratio=``: passing
+    ``penalty='l1'`` there emits a ``FutureWarning`` plus a follow-up
+    ``UserWarning`` about the implied ``l1_ratio``. On sklearn < 1.8 the
+    ``l1_ratio`` route is silently ignored and yields an L2 fit, so we branch
+    on the installed version to stay warning-free across the supported range.
+    """
+    try:
+        major, minor = (int(part) for part in _sklearn_version.split(".")[:2])
+    except ValueError:  # unparseable dev/nightly tag — assume the modern API
+        return {"l1_ratio": 1}
+    if (major, minor) >= (1, 8):
+        return {"l1_ratio": 1}
+    return {"penalty": "l1"}
+
+
+_L1_LOGREG_KWARGS = _l1_logreg_kwargs()
+
+
 @dataclass(frozen=True, slots=True)
 class SklearnLogisticRegression:
-    """Adapter for ``Problem(LogisticLoss, L1, X, y)`` via ``LogisticRegression(penalty='l1')``.
+    """Adapter for ``Problem(LogisticLoss, L1, X, y)`` via an L1-penalized ``LogisticRegression``.
 
     Assumes binary ``y ∈ {−1, +1}``. sklearn relabels internally. The dual
     gap is not exposed by sklearn for logistic regression; we report a
@@ -234,7 +256,7 @@ class SklearnLogisticRegression:
         if not np.array_equal(np.unique(y), np.array([-1.0, 1.0])):
             raise ValueError("LogisticLoss expects y ∈ {−1, +1}")
         est = LogisticRegression(
-            penalty="l1",
+            **_L1_LOGREG_KWARGS,
             C=1.0 / alpha,
             fit_intercept=False,
             solver="liblinear",
